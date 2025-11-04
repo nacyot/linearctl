@@ -35,6 +35,7 @@ describe('issue get command', () => {
   it('should display issue details', async () => {
     const mockIssue = {
       assignee: Promise.resolve({ name: 'John Doe' }),
+      attachments: vi.fn().mockResolvedValue({ nodes: [] }),
       children: vi.fn().mockResolvedValue({ nodes: [] }),
       comments: vi.fn().mockResolvedValue({ nodes: [] }),
       createdAt: new Date('2024-01-01'),
@@ -77,6 +78,7 @@ describe('issue get command', () => {
   it('should display JSON output when flag is set', async () => {
     const mockIssue = {
       assignee: Promise.resolve(null),
+      attachments: vi.fn().mockResolvedValue({ nodes: [] }),
       children: vi.fn().mockResolvedValue({ nodes: [] }),
       comments: vi.fn().mockResolvedValue({ nodes: [] }),
       createdAt: new Date('2024-01-01'),

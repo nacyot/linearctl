@@ -44,7 +44,7 @@ static flags = {
       }
       
       // Fetch related data
-      const [state, assignee, team, labels, project, parent, children, comments] = await Promise.all([
+      const [state, assignee, team, labels, project, parent, children, comments, attachments] = await Promise.all([
         issue.state,
         issue.assignee,
         issue.team,
@@ -53,12 +53,14 @@ static flags = {
         issue.parent,
         issue.children(),
         issue.comments(),
+        issue.attachments(),
       ])
       
       // Output results
       if (flags.json) {
         const output = {
           assignee: assignee ? { id: assignee.id, name: assignee.name } : null,
+          attachments: attachments.nodes.map(a => ({ id: a.id, title: a.title, url: a.url })),
           children: children.nodes.map(c => ({ id: c.id, identifier: c.identifier })),
           comments: comments.nodes.length,
           createdAt: issue.createdAt,
@@ -76,7 +78,7 @@ static flags = {
         }
         console.log(JSON.stringify(output, null, 2))
       } else {
-        this.displayIssue(issue, { assignee, children, comments, labels, parent, project, state, team })
+        this.displayIssue(issue, { assignee, attachments, children, comments, labels, parent, project, state, team })
       }
       
     } catch (error) {
@@ -164,7 +166,16 @@ static flags = {
       console.log(chalk.gray(`\n─ Comments (${related.comments.nodes.length}) ─`))
       console.log(chalk.gray(`Run "lc comment list --issue ${issue.identifier}" to view comments`))
     }
-    
+
+    // Attachments
+    if (related.attachments && related.attachments.nodes.length > 0) {
+      console.log(chalk.gray(`\n─ Attachments (${related.attachments.nodes.length}) ─`))
+      for (const attachment of related.attachments.nodes) {
+        console.log(`  • ${attachment.title}`)
+        console.log(chalk.blue(`    ${attachment.url}`))
+      }
+    }
+
     // URL
     if (issue.url) {
       console.log(chalk.gray('\n─ View in Linear ─'))
