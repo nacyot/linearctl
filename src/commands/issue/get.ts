@@ -44,7 +44,7 @@ static flags = {
       }
       
       // Fetch related data
-      const [state, assignee, team, labels, project, parent, children, comments, attachments] = await Promise.all([
+      const [state, assignee, team, labels, project, parent, children, comments, attachments, cycle] = await Promise.all([
         issue.state,
         issue.assignee,
         issue.team,
@@ -54,6 +54,7 @@ static flags = {
         issue.children(),
         issue.comments(),
         issue.attachments(),
+        issue.cycle,
       ])
       
       // Output results
@@ -64,6 +65,7 @@ static flags = {
           children: children.nodes.map(c => ({ id: c.id, identifier: c.identifier })),
           comments: comments.nodes.length,
           createdAt: issue.createdAt,
+          cycle: cycle ? { id: cycle.id, name: cycle.name, number: cycle.number } : null,
           description: issue.description,
           id: issue.id,
           identifier: issue.identifier,
@@ -78,7 +80,7 @@ static flags = {
         }
         console.log(JSON.stringify(output, null, 2))
       } else {
-        this.displayIssue(issue, { assignee, attachments, children, comments, labels, parent, project, state, team })
+        this.displayIssue(issue, { assignee, attachments, children, comments, cycle, labels, parent, project, state, team })
       }
       
     } catch (error) {
@@ -95,6 +97,7 @@ static flags = {
     attachments?: {nodes: Array<{title: string; url: string}>};
     children?: {nodes: Array<{identifier: string; title: string}>};
     comments?: {nodes: {length: number}};
+    cycle?: {name: string; number: number};
     dueDate?: string;
     labels?: {nodes: Array<{name: string}>};
     parent?: {identifier: string; title: string};
@@ -130,7 +133,11 @@ static flags = {
     if (related.project) {
       info.push(`Project: ${related.project.name}`)
     }
-    
+
+    if (related.cycle) {
+      info.push(`Cycle: ${related.cycle.name}`)
+    }
+
     console.log(info.join(chalk.gray(' • ')))
     
     // Labels
