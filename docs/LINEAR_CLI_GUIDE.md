@@ -81,6 +81,46 @@ lc comment add <issue-id> [options]
   -p, --parent <id>           Parent comment ID for replies
 ```
 
+## Attachments
+
+### lc attachment list
+```bash
+lc attachment list <issue-id> [--json]
+```
+
+### lc attachment add
+```bash
+lc attachment add [options]
+  -i, --issue <id>            Issue ID (required)
+  -u, --url <url>             URL to attach (required)
+  -t, --title <text>          Attachment title (default: URL hostname)
+  -s, --subtitle <text>       Subtitle
+  -d, --description <text>    Description
+  --icon-url <url>            Icon URL
+  --metadata <json>           Metadata as JSON string
+  -o, --open                  Open attachment in browser after creation
+  -j, --json                  Output as JSON
+```
+
+### lc attachment upload
+```bash
+lc attachment upload [options]
+  -i, --issue <id>            Issue ID (required)
+  -f, --file <path>           File path to upload (required)
+  -t, --title <text>          Attachment title (default: filename)
+  -s, --subtitle <text>       Subtitle
+  -d, --description <text>    Description
+  --icon-url <url>            Icon URL
+  --metadata <json>           Metadata as JSON string
+  -o, --open                  Open attachment in browser after upload
+  -j, --json                  Output as JSON
+```
+
+### lc attachment delete
+```bash
+lc attachment delete <attachment-id> [--json]
+```
+
 ## Teams
 
 ### lc team list
