@@ -96,3 +96,30 @@ export interface CommentFlags {
 export interface InitFlags {
   token?: string
 }
+
+// Attachment command flags
+export type AttachmentListFlags = CommonFlags
+
+export interface AttachmentAddFlags extends CommonFlags {
+  description?: string
+  'icon-url'?: string
+  issue: string
+  metadata?: string
+  open?: boolean
+  subtitle?: string
+  title?: string
+  url: string
+}
+
+export interface AttachmentUploadFlags extends CommonFlags {
+  description?: string
+  file: string
+  'icon-url'?: string
+  issue: string
+  metadata?: string
+  open?: boolean
+  subtitle?: string
+  title?: string
+}
+
+export type AttachmentDeleteFlags = CommonFlags

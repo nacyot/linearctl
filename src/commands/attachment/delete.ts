@@ -1,0 +1,77 @@
+import { Args, Command, Flags } from '@oclif/core'
+import chalk from 'chalk'
+
+import { getLinearClient, hasApiKey } from '../../services/linear.js'
+import { AttachmentDeleteFlags } from '../../types/commands.js'
+
+export default class AttachmentDelete extends Command {
+  static args = {
+    id: Args.string({
+      description: 'Attachment ID',
+      required: true,
+    }),
+  }
+static description = 'Delete an attachment from a Linear issue'
+static examples = [
+    '<%= config.bin %> <%= command.id %> attachment-uuid-123',
+    '<%= config.bin %> <%= command.id %> attachment-uuid-123 --json',
+  ]
+static flags = {
+    json: Flags.boolean({
+      char: 'j',
+      default: false,
+      description: 'Output as JSON',
+    }),
+  }
+
+  async run(): Promise<void> {
+    const { args, flags } = await this.parse(AttachmentDelete)
+    await this.runWithArgs(args.id, flags)
+  }
+
+  async runWithArgs(attachmentId: string, flags: AttachmentDeleteFlags = {}): Promise<void> {
+    // Check API key
+    if (!hasApiKey()) {
+      throw new Error('No API key configured. Run "lc init" first.')
+    }
+
+    const client = getLinearClient()
+
+    try {
+      // Delete attachment
+      if (!flags.json) {
+        console.log(chalk.gray(`Deleting attachment ${attachmentId}...`))
+      }
+
+      const payload = await client.deleteAttachment(attachmentId)
+
+      if (!payload.success) {
+        throw new Error('Failed to delete attachment')
+      }
+
+      // Display success message
+      if (flags.json) {
+        console.log(
+          JSON.stringify(
+            {
+              id: attachmentId,
+              success: true,
+            },
+            null,
+            2
+          )
+        )
+      } else {
+        console.log(chalk.green(`\n✓ Attachment deleted successfully!`))
+        console.log(chalk.gray(`ID: ${attachmentId}`))
+        console.log('')
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error
+      }
+
+      throw new Error(`Failed to delete attachment ${attachmentId}`)
+    }
+  }
+}
