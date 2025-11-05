@@ -10,7 +10,7 @@ lc issue list [options]
   -s, --state <name>          Filter by state (comma-separated for multiple)
   -l, --label <name>          Filter by label
   -p, --project <name>        Filter by project
-  -c, --cycle <name>          Filter by cycle
+  -c, --cycle <name-or-num>   Filter by cycle name or number (e.g., "Sprint 1" or 1)
   --exclude-state <name>      Exclude state(s) (comma-separated)
   --search <text>             Search in title and description
   --limit <number>            Number of issues (max 250)
@@ -36,7 +36,7 @@ lc issue create [options]
   -l, --labels <names>        Comma-separated labels
   --due-date <YYYY-MM-DD>     Due date
   --project <name>            Project
-  -c, --cycle <name>          Cycle
+  -c, --cycle <name-or-num>   Cycle name or number (e.g., "Sprint 1" or 1)
   --parent <id>               Parent issue ID or identifier (e.g., ENG-123)
   --delegate <emails>         Comma-separated delegate emails
   --links <ids>               Comma-separated issue IDs to link
@@ -56,7 +56,7 @@ lc issue update <id> [options]
   --remove-labels <names>     Remove specific labels
   --due-date <YYYY-MM-DD>     Due date (use "none" to clear)
   --project <name>            Project
-  -c, --cycle <name>          Cycle
+  -c, --cycle <name-or-num>   Cycle name or number (e.g., "Sprint 1" or 1)
   --parent <id>               Parent issue ID or identifier (e.g., ENG-123)
   --duplicate-of <id>         Mark as duplicate of issue (sets state and relation)
   -e, --estimate <number>     Story points
@@ -88,7 +88,7 @@ lc issue batch --ids <ids> [options]
   --ids <ids>                 Comma-separated issue IDs (e.g., ENG-123,ENG-124) (required)
   -s, --state <name>          Set state
   -a, --assignee <name>       Set assignee
-  -c, --cycle <name>          Cycle number or "none" to remove cycle
+  -c, --cycle <name-or-num>   Cycle name, number, or "none" to remove (e.g., "Sprint 1", 1, or "none")
   --add-labels <names>        Add labels (preserves existing)
   --dry-run                   Preview changes without updating
   --json                      Output as JSON
