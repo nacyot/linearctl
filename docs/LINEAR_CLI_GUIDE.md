@@ -67,6 +67,27 @@ lc issue mine [options]
   --json                      Output as JSON
 ```
 
+### lc issue batch
+```bash
+lc issue batch --ids <ids> [options]
+  --ids <ids>                 Comma-separated issue IDs (e.g., ENG-123,ENG-124) (required)
+  -c, --cycle <name>          Cycle number or "none" to remove cycle
+  --dry-run                   Preview changes without updating
+  --json                      Output as JSON
+```
+
+Examples:
+```bash
+# Assign multiple issues to a cycle
+lc issue batch --ids ENG-123,ENG-124,ENG-125 --cycle 5
+
+# Remove cycle from issues
+lc issue batch --ids ENG-123,ENG-124 --cycle none
+
+# Preview changes before applying
+lc issue batch --ids ENG-123,ENG-124 --cycle 5 --dry-run
+```
+
 ## Comments
 
 ### lc comment list

@@ -123,3 +123,10 @@ export interface AttachmentUploadFlags extends CommonFlags {
 }
 
 export type AttachmentDeleteFlags = CommonFlags
+
+// Batch update flags
+export interface IssueBatchFlags extends CommonFlags {
+  cycle?: string
+  'dry-run'?: boolean
+  ids: string
+}
