@@ -9,6 +9,7 @@ export interface ListFlags extends CommonFlags {
   'created-at'?: string
   creator?: string
   cycle?: string
+  'exclude-state'?: string
   'include-archived'?: boolean
   label?: string
   limit?: number
@@ -16,6 +17,7 @@ export interface ListFlags extends CommonFlags {
   parent?: string
   project?: string
   query?: string
+  search?: string
   state?: string
   team?: string
   'updated-at'?: string

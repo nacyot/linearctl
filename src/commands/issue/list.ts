@@ -4,6 +4,7 @@ import chalk from 'chalk'
 
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { ListFlags } from '../../types/commands.js'
+import { findSimilar, getSuggestionMessage } from '../../utils/fuzzy.js'
 import { formatState, formatTable, truncateText } from '../../utils/table-formatter.js'
 
 // Type for issues with resolved assignee and state
@@ -32,6 +33,9 @@ static flags = {
       char: 'c',
       description: 'Filter by cycle name or ID',
     }),
+    'exclude-state': Flags.string({
+      description: 'Exclude state name(s), comma-separated',
+    }),
     'include-archived': Flags.boolean({
       default: false,
       description: 'Include archived issues',
@@ -57,9 +61,12 @@ static flags = {
       char: 'p',
       description: 'Filter by project name or ID',
     }),
+    search: Flags.string({
+      description: 'Search in title and description (case-insensitive)',
+    }),
     state: Flags.string({
       char: 's',
-      description: 'Filter by state name or ID',
+      description: 'Filter by state name(s), comma-separated',
     }),
     team: Flags.string({
       char: 't',
@@ -86,75 +93,178 @@ static flags = {
       
       // Team filter - resolve first as it's needed for state resolution
       let teamId: null | string = null
-      if (flags.team) {
+      if (flags.team && flags.team.trim()) {
         teamId = await this.resolveTeamId(client, flags.team)
         if (teamId) {
           filter.team = { id: { eq: teamId } }
         } else {
-          // Team not found - return empty results
+          // Team not found - show suggestions
+          const allTeams = await client.teams()
+          const similar = findSimilar(
+            flags.team,
+            allTeams.nodes,
+            (team) => team.name || team.key,
+          )
+          const suggestion = getSuggestionMessage(similar, (team) => team.name || team.key)
+
           console.log(chalk.yellow(`Team "${flags.team}" not found`))
+          if (suggestion) {
+            console.log(chalk.gray(suggestion))
+          }
+
           return
         }
       }
       
       // Assignee filter
-      if (flags.assignee) {
+      if (flags.assignee && flags.assignee.trim()) {
         const userId = await this.resolveUserId(client, flags.assignee)
         if (userId) {
           filter.assignee = { id: { eq: userId } }
         } else {
-          // Assignee not found - return empty results
+          // Assignee not found - show suggestions
+          const allUsers = await client.users()
+          const similar = findSimilar(
+            flags.assignee,
+            allUsers.nodes,
+            (user) => user.name || user.email,
+          )
+          const suggestion = getSuggestionMessage(similar, (user) => user.name || user.email)
+
           console.log(chalk.yellow(`Assignee "${flags.assignee}" not found`))
+          if (suggestion) {
+            console.log(chalk.gray(suggestion))
+          }
+
           return
         }
       }
       
-      // State filter - pass teamId for context
-      if (flags.state) {
-        const stateId = await this.resolveStateId(client, flags.state, teamId)
-        if (stateId) {
-          filter.state = { id: { eq: stateId } }
+      // State filter - supports comma-separated values
+      if (flags.state && flags.state.trim()) {
+        const stateNames = flags.state.split(',').map(s => s.trim()).filter(s => s.length > 0)
+        const stateIds = await Promise.all(
+          stateNames.map(name => this.resolveStateId(client, name, teamId))
+        )
+        const validStateIds = stateIds.filter((id): id is string => id !== null)
+
+        if (validStateIds.length > 0) {
+          filter.state = { id: { in: validStateIds } }
         } else {
-          // State not found - return empty results
-          console.log(chalk.yellow(`State "${flags.state}" not found${teamId ? ' in team' : ''}`))
+          // No states found - show suggestions for first state
+          const allStates = await client.workflowStates()
+          const similar = findSimilar(
+            stateNames[0],
+            allStates.nodes,
+            (state) => state.name,
+          )
+          const suggestion = getSuggestionMessage(similar, (state) => state.name)
+
+          console.log(chalk.yellow(`State(s) "${flags.state}" not found${teamId ? ' in team' : ''}`))
+          if (suggestion) {
+            console.log(chalk.gray(suggestion))
+          }
+
           return
+        }
+      }
+
+      // Exclude state filter
+      if (flags['exclude-state']) {
+        const excludeNames = flags['exclude-state'].split(',').map(s => s.trim()).filter(s => s.length > 0)
+        const excludeIds = await Promise.all(
+          excludeNames.map(name => this.resolveStateId(client, name, teamId))
+        )
+        const validExcludeIds = excludeIds.filter((id): id is string => id !== null)
+
+        if (validExcludeIds.length > 0) {
+          filter.state = { id: { nin: validExcludeIds } }
         }
       }
       
       // Label filter
-      if (flags.label) {
+      if (flags.label && flags.label.trim()) {
         const labelId = await this.resolveLabelId(client, flags.label)
         if (labelId) {
           filter.labels = { id: { in: [labelId] } }
         } else {
-          // Label not found - return empty results
+          // Label not found - show suggestions
+          const allLabels = await client.issueLabels()
+          const similar = findSimilar(
+            flags.label,
+            allLabels.nodes,
+            (label) => label.name,
+          )
+          const suggestion = getSuggestionMessage(similar, (label) => label.name)
+
           console.log(chalk.yellow(`Label "${flags.label}" not found`))
+          if (suggestion) {
+            console.log(chalk.gray(suggestion))
+          }
+
           return
         }
       }
-      
+
       // Project filter
-      if (flags.project) {
+      if (flags.project && flags.project.trim()) {
         const projectId = await this.resolveProjectId(client, flags.project)
         if (projectId) {
           filter.project = { id: { eq: projectId } }
         } else {
-          // Project not found - return empty results
+          // Project not found - show suggestions
+          const allProjects = await client.projects()
+          const similar = findSimilar(
+            flags.project,
+            allProjects.nodes,
+            (project) => project.name,
+          )
+          const suggestion = getSuggestionMessage(similar, (project) => project.name)
+
           console.log(chalk.yellow(`Project "${flags.project}" not found`))
+          if (suggestion) {
+            console.log(chalk.gray(suggestion))
+          }
+
           return
         }
       }
-      
+
       // Cycle filter
-      if (flags.cycle) {
+      if (flags.cycle && flags.cycle.trim()) {
         const cycleId = await this.resolveCycleId(client, flags.cycle, teamId)
         if (cycleId) {
           filter.cycle = { id: { eq: cycleId } }
         } else {
-          // Cycle not found - return empty results
-          console.log(chalk.yellow(`Cycle "${flags.cycle}" not found${teamId ? ' in team' : ''}`))
+          // Cycle not found - show suggestions
+          if (teamId) {
+            const team = await client.team(teamId)
+            const allCycles = await team.cycles()
+            const similar = findSimilar(
+              flags.cycle,
+              allCycles.nodes,
+              (cycle) => cycle.name || String(cycle.number),
+            )
+            const suggestion = getSuggestionMessage(similar, (cycle) => cycle.name || `Cycle ${cycle.number}`)
+
+            console.log(chalk.yellow(`Cycle "${flags.cycle}" not found in team`))
+            if (suggestion) {
+              console.log(chalk.gray(suggestion))
+            }
+          } else {
+            console.log(chalk.yellow(`Cycle "${flags.cycle}" not found`))
+          }
+
           return
         }
+      }
+
+      // Search filter - searches in title and description
+      if (flags.search && flags.search.trim()) {
+        filter.or = [
+          { title: { containsIgnoreCase: flags.search } },
+          { description: { containsIgnoreCase: flags.search } }
+        ]
       }
       
       // Prepare query variables

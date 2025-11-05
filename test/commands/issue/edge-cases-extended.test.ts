@@ -67,18 +67,19 @@ describe('issue list edge cases - extended', () => {
       mockClient.teams.mockResolvedValue({
         nodes: [{ id: 'team-123', key: 'ENG', name: 'Engineering' }],
       })
-      
+
       const mockTeam = {
         id: 'team-123',
         states: vi.fn().mockResolvedValue({ nodes: [] }),
       }
       mockClient.team.mockReturnValue(mockTeam)
-      
+      mockClient.workflowStates.mockResolvedValue({ nodes: [] })
+
       const IssueList = (await import('../../../src/commands/issue/list.js')).default
       const cmd = new IssueList([], {} as any)
       await cmd.runWithoutParse({ state: 'NonExistentState', team: 'ENG' })
-      
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('State "NonExistentState" not found'))
+
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('State(s) "NonExistentState" not found'))
       expect(mockClient.issues).not.toHaveBeenCalled()
     })
 
@@ -169,7 +170,7 @@ describe('issue list edge cases - extended', () => {
       expect(mockClient.issues).toHaveBeenCalledWith(
         expect.objectContaining({
           filter: expect.objectContaining({
-            state: { id: { eq: 'state-1' } },
+            state: { id: { in: ['state-1'] } },
           }),
         })
       )
@@ -333,7 +334,7 @@ describe('issue list edge cases - extended', () => {
             cycle: { id: { eq: 'cycle-1' } },
             labels: { id: { in: ['label-123'] } },
             project: { id: { eq: 'project-123' } },
-            state: { id: { eq: 'state-1' } },
+            state: { id: { in: ['state-1'] } },
             team: { id: { eq: 'team-123' } },
           }),
           first: 100,

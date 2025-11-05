@@ -82,7 +82,7 @@ describe('issue list filtering', () => {
     expect(mockClient.issues).toHaveBeenCalledWith(
       expect.objectContaining({
         filter: expect.objectContaining({
-          state: { id: { eq: 'state-1' } },
+          state: { id: { in: ['state-1'] } },
           team: { id: { eq: 'team-123' } },
         }),
       })
@@ -224,7 +224,7 @@ describe('issue list filtering', () => {
         filter: expect.objectContaining({
           assignee: { id: { eq: 'user-123' } },
           labels: { id: { in: ['label-123'] } },
-          state: { id: { eq: 'state-1' } },
+          state: { id: { in: ['state-1'] } },
           team: { id: { eq: 'team-123' } },
         }),
       })
@@ -235,19 +235,141 @@ describe('issue list filtering', () => {
     // Test with label ID (contains hyphen)
     mockClient.issueLabels.mockResolvedValue({ nodes: [] })
     mockClient.issues.mockResolvedValue({ nodes: [] })
-    
+
     const IssueList = (await import('../../../src/commands/issue/list.js')).default
     const cmd = new IssueList([], {} as any)
     await cmd.runWithoutParse({ label: '2be7acd3-9f68-4107-ac8c-1b182d60c517' })
-    
+
     // Should not call issueLabels for IDs
     expect(mockClient.issueLabels).not.toHaveBeenCalled()
-    
+
     // Should use the ID directly
     expect(mockClient.issues).toHaveBeenCalledWith(
       expect.objectContaining({
         filter: expect.objectContaining({
           labels: { id: { in: ['2be7acd3-9f68-4107-ac8c-1b182d60c517'] } },
+        }),
+      })
+    )
+  })
+
+  it('should filter by multiple states using comma-separated values', async () => {
+    const mockTeam = {
+      id: 'team-123',
+      states: vi.fn().mockResolvedValue({
+        nodes: [
+          { id: 'state-1', name: 'Backlog', type: 'backlog' },
+          { id: 'state-2', name: 'Todo', type: 'unstarted' },
+          { id: 'state-3', name: 'In Progress', type: 'started' },
+          { id: 'state-4', name: 'Done', type: 'completed' },
+        ],
+      }),
+    }
+
+    mockClient.teams.mockResolvedValue({
+      nodes: [{ id: 'team-123', key: 'NAC', name: 'Nacyot' }],
+    })
+
+    mockClient.team.mockReturnValue(mockTeam)
+
+    const mockIssues = {
+      nodes: [
+        {
+          assignee: Promise.resolve(null),
+          identifier: 'NAC-1',
+          state: Promise.resolve({ name: 'Backlog', type: 'backlog' }),
+          title: 'Issue 1',
+        },
+        {
+          assignee: Promise.resolve(null),
+          identifier: 'NAC-2',
+          state: Promise.resolve({ name: 'Todo', type: 'unstarted' }),
+          title: 'Issue 2',
+        },
+      ],
+    }
+
+    mockClient.issues.mockResolvedValue(mockIssues)
+
+    const IssueList = (await import('../../../src/commands/issue/list.js')).default
+    const cmd = new IssueList([], {} as any)
+    await cmd.runWithoutParse({ state: 'Backlog,Todo,In Progress', team: 'NAC' })
+
+    // Verify states were resolved
+    expect(mockClient.team).toHaveBeenCalledWith('team-123')
+    expect(mockTeam.states).toHaveBeenCalled()
+
+    // Verify issues were filtered with 'in' operator
+    expect(mockClient.issues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filter: expect.objectContaining({
+          state: { id: { in: ['state-1', 'state-2', 'state-3'] } },
+          team: { id: { eq: 'team-123' } },
+        }),
+      })
+    )
+  })
+
+  it('should exclude states using exclude-state flag', async () => {
+    const mockTeam = {
+      id: 'team-123',
+      states: vi.fn().mockResolvedValue({
+        nodes: [
+          { id: 'state-1', name: 'Done', type: 'completed' },
+          { id: 'state-2', name: 'Canceled', type: 'canceled' },
+        ],
+      }),
+    }
+
+    mockClient.teams.mockResolvedValue({
+      nodes: [{ id: 'team-123', key: 'NAC', name: 'Nacyot' }],
+    })
+
+    mockClient.team.mockReturnValue(mockTeam)
+
+    const mockIssues = {
+      nodes: [
+        {
+          assignee: Promise.resolve(null),
+          identifier: 'NAC-1',
+          state: Promise.resolve({ name: 'Backlog', type: 'backlog' }),
+          title: 'Active issue',
+        },
+      ],
+    }
+
+    mockClient.issues.mockResolvedValue(mockIssues)
+
+    const IssueList = (await import('../../../src/commands/issue/list.js')).default
+    const cmd = new IssueList([], {} as any)
+    await cmd.runWithoutParse({ 'exclude-state': 'Done,Canceled', team: 'NAC' })
+
+    // Verify issues were filtered with 'nin' operator
+    expect(mockClient.issues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filter: expect.objectContaining({
+          state: { id: { nin: ['state-1', 'state-2'] } },
+          team: { id: { eq: 'team-123' } },
+        }),
+      })
+    )
+  })
+
+  it('should handle text search in title and description', async () => {
+    mockClient.issues.mockResolvedValue({ nodes: [] })
+
+    const IssueList = (await import('../../../src/commands/issue/list.js')).default
+    const cmd = new IssueList([], {} as any)
+    await cmd.runWithoutParse({ search: '블랙박스' })
+
+    // Verify search filter with 'or' operator
+    expect(mockClient.issues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filter: expect.objectContaining({
+          or: [
+            { title: { containsIgnoreCase: '블랙박스' } },
+            { description: { containsIgnoreCase: '블랙박스' } },
+          ],
         }),
       })
     )

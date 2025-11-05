@@ -156,7 +156,7 @@ describe('issue list command', () => {
     
     expect(mockClient.issues).toHaveBeenCalledWith({
       filter: {
-        state: { id: { eq: 'state-1' } },
+        state: { id: { in: ['state-1'] } },
       },
       first: 50,
       includeArchived: false,
