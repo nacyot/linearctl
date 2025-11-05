@@ -1,3 +1,4 @@
+import * as fs from 'node:fs/promises'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import * as uploadFileModule from '../../../src/lib/upload-file.js'
@@ -17,6 +18,7 @@ vi.mock('../../../src/lib/upload-file.js', () => ({
 // Mock fs promises
 vi.mock('node:fs/promises', () => ({
   access: vi.fn(),
+  stat: vi.fn(),
 }))
 
 // Mock mime-types
@@ -30,6 +32,7 @@ describe('attachment upload command', () => {
   let logSpy: ReturnType<typeof vi.spyOn>
   let errorSpy: ReturnType<typeof vi.spyOn>
   let mockClient: {
+    createAttachment: ReturnType<typeof vi.fn>
     fileUpload: ReturnType<typeof vi.fn>
     issue: ReturnType<typeof vi.fn>
   }
@@ -41,12 +44,16 @@ describe('attachment upload command', () => {
 
     // Create mock client
     mockClient = {
+      createAttachment: vi.fn(),
       fileUpload: vi.fn(),
       issue: vi.fn(),
     }
 
     vi.mocked(linearService.hasApiKey).mockReturnValue(true)
     vi.mocked(linearService.getLinearClient).mockReturnValue(mockClient as never)
+
+    // Mock stat to return file size
+    vi.mocked(fs.stat).mockResolvedValue({ size: 12_345 } as never)
   })
 
   afterEach(() => {
@@ -80,10 +87,14 @@ describe('attachment upload command', () => {
 
     mockClient.issue.mockResolvedValue(mockIssue)
     mockClient.fileUpload.mockResolvedValue({
+      lastSyncId: 0,
+      success: true,
+      uploadFile: mockUploadPayload,
+    })
+    mockClient.createAttachment.mockResolvedValue({
       attachment: mockAttachment,
       lastSyncId: 0,
       success: true,
-      uploadPayload: mockUploadPayload,
     })
 
     const fs = await import('node:fs/promises')
@@ -140,10 +151,14 @@ describe('attachment upload command', () => {
 
     mockClient.issue.mockResolvedValue(mockIssue)
     mockClient.fileUpload.mockResolvedValue({
+      lastSyncId: 0,
+      success: true,
+      uploadFile: mockUploadPayload,
+    })
+    mockClient.createAttachment.mockResolvedValue({
       attachment: mockAttachment,
       lastSyncId: 0,
       success: true,
-      uploadPayload: mockUploadPayload,
     })
 
     const fs = await import('node:fs/promises')
@@ -294,10 +309,14 @@ describe('attachment upload command', () => {
 
     mockClient.issue.mockResolvedValue(mockIssue)
     mockClient.fileUpload.mockResolvedValue({
+      lastSyncId: 0,
+      success: true,
+      uploadFile: mockUploadPayload,
+    })
+    mockClient.createAttachment.mockResolvedValue({
       attachment: mockAttachment,
       lastSyncId: 0,
       success: true,
-      uploadPayload: mockUploadPayload,
     })
 
     const fs = await import('node:fs/promises')
@@ -319,7 +338,8 @@ describe('attachment upload command', () => {
       title: 'Custom Title',
     })
 
-    expect(mockClient.fileUpload).toHaveBeenCalledWith(
+    expect(mockClient.fileUpload).toHaveBeenCalledWith('image/png', 'file.png', 12_345)
+    expect(mockClient.createAttachment).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Custom Title',
       })

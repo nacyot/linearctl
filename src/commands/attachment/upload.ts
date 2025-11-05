@@ -1,7 +1,7 @@
 import { Command, Flags } from '@oclif/core'
 import chalk from 'chalk'
 import mime from 'mime-types'
-import { access } from 'node:fs/promises'
+import { access, stat } from 'node:fs/promises'
 import path from 'node:path'
 
 import type { AttachmentUploadFlags } from '../../types/commands.js'
@@ -85,6 +85,10 @@ export default class AttachmentUpload extends Command {
         throw new Error(`Issue ${flags.issue} not found`)
       }
 
+      // Get file size
+      const fileStats = await stat(flags.file)
+      const fileSize = fileStats.size
+
       // Determine content type
       const contentType = mime.lookup(flags.file) || 'application/octet-stream'
 
@@ -92,57 +96,16 @@ export default class AttachmentUpload extends Command {
       const filename = path.basename(flags.file)
       const title = flags.title || filename
 
-      // Build file upload input
-      const input: {
-        contentType: string
-        description?: string
-        filename: string
-        iconUrl?: string
-        issueId: string
-        metadata?: Record<string, number | string>
-        size: number
-        subtitle?: string
-        title: string
-      } = {
-        contentType,
-        filename,
-        issueId: issue.id,
-        size: 0, // Will be filled after stat
-        title,
-      }
-
-      if (flags.subtitle) {
-        input.subtitle = flags.subtitle
-      }
-
-      if (flags.description) {
-        input.description = flags.description
-      }
-
-      if (flags['icon-url']) {
-        input.iconUrl = flags['icon-url']
-      }
-
-      if (flags.metadata) {
-        try {
-          input.metadata = JSON.parse(flags.metadata)
-        } catch {
-          throw new Error('Invalid metadata JSON')
-        }
-      }
-
       // Request upload URL from Linear
       if (!flags.json) {
         console.log(chalk.gray(`Preparing to upload ${filename}...`))
       }
 
-      const uploadResult = await client.fileUpload(input)
+      const uploadResult = await client.fileUpload(contentType, filename, fileSize)
 
       if (!uploadResult.success) {
         throw new Error('Failed to get upload URL from Linear')
       }
-
-      const { uploadPayload } = uploadResult
 
       // Upload file to signed URL
       if (!flags.json) {
@@ -151,27 +114,37 @@ export default class AttachmentUpload extends Command {
 
       await uploadFile({
         filePath: flags.file,
-        headers: uploadPayload.headers,
-        uploadUrl: uploadPayload.uploadUrl,
+        headers: uploadResult.uploadFile?.headers ? uploadResult.uploadFile.headers.map(h => ({ key: h.key, value: h.value })) : [],
+        uploadUrl: uploadResult.uploadFile?.uploadUrl || '',
+      })
+
+      // Create attachment with the uploaded file URL
+      const attachment = await client.createAttachment({
+        iconUrl: flags['icon-url'],
+        issueId: issue.id,
+        subtitle: flags.subtitle,
+        title,
+        url: uploadResult.uploadFile?.assetUrl || '',
       })
 
       // Display success message
       if (flags.json) {
-        console.log(JSON.stringify(uploadResult.attachment, null, 2))
+        const attachmentData = await attachment.attachment
+        console.log(JSON.stringify(attachmentData, null, 2))
       } else {
         console.log(chalk.green(`\n✓ File uploaded successfully!`))
         console.log(chalk.gray(`Title: ${title}`))
-        if (uploadResult.attachment?.url) {
-          console.log(chalk.blue(`URL: ${uploadResult.attachment.url}`))
+        if (uploadResult.uploadFile?.assetUrl) {
+          console.log(chalk.blue(`URL: ${uploadResult.uploadFile.assetUrl}`))
         }
 
         console.log('')
       }
 
       // Open URL if requested
-      if (flags.open && uploadResult.attachment?.url) {
+      if (flags.open && uploadResult.uploadFile?.assetUrl) {
         const open = await import('open')
-        await open.default(uploadResult.attachment.url)
+        await open.default(uploadResult.uploadFile.assetUrl)
       }
     } catch (error) {
       if (error instanceof Error) {
