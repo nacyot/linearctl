@@ -65,7 +65,7 @@ static flags = {
           children: children.nodes.map(c => ({ id: c.id, identifier: c.identifier })),
           comments: comments.nodes.length,
           createdAt: issue.createdAt,
-          cycle: cycle ? { id: cycle.id, name: cycle.name, number: cycle.number } : null,
+          cycle: cycle ? { id: cycle.id, name: cycle.name || '', number: cycle.number || 0 } : null,
           description: issue.description,
           id: issue.id,
           identifier: issue.identifier,
@@ -97,7 +97,7 @@ static flags = {
     attachments?: {nodes: Array<{title: string; url: string}>};
     children?: {nodes: Array<{identifier: string; title: string}>};
     comments?: {nodes: {length: number}};
-    cycle?: {name: string; number: number};
+    cycle?: {name?: string; number?: number};
     dueDate?: string;
     labels?: {nodes: Array<{name: string}>};
     parent?: {identifier: string; title: string};
@@ -134,7 +134,7 @@ static flags = {
       info.push(`Project: ${related.project.name}`)
     }
 
-    if (related.cycle) {
+    if (related.cycle && related.cycle.name) {
       info.push(`Cycle: ${related.cycle.name}`)
     }
 
