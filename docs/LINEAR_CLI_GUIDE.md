@@ -7,10 +7,12 @@ Use `lc` (after installing globally) or `npx linearctl` (without installation).
 lc issue list [options]
   -t, --team <name>           Filter by team
   -a, --assignee <name>       Filter by assignee
-  -s, --state <name>          Filter by state
+  -s, --state <name>          Filter by state (comma-separated for multiple)
   -l, --label <name>          Filter by label
   -p, --project <name>        Filter by project
   -c, --cycle <name>          Filter by cycle
+  --exclude-state <name>      Exclude state(s) (comma-separated)
+  --search <text>             Search in title and description
   --limit <number>            Number of issues (max 250)
   --include-archived          Include archived issues
   --order-by <field>          Order by field (createdAt, updatedAt)
@@ -35,9 +37,10 @@ lc issue create [options]
   --due-date <YYYY-MM-DD>     Due date
   --project <name>            Project
   -c, --cycle <name>          Cycle
-  --parent <id>               Parent issue ID
+  --parent <id>               Parent issue ID or identifier (e.g., ENG-123)
   --delegate <emails>         Comma-separated delegate emails
   --links <ids>               Comma-separated issue IDs to link
+  --json                      Output as JSON
 ```
 
 ### lc issue update
@@ -48,14 +51,18 @@ lc issue update <id> [options]
   -a, --assignee <name>       Assignee (use "none" to clear)
   -s, --state <name>          State
   -p, --priority <0-4>        Priority
-  -l, --labels <names>        Comma-separated labels
+  -l, --labels <names>        Replace all labels (comma-separated)
+  --add-labels <names>        Add labels (preserves existing)
+  --remove-labels <names>     Remove specific labels
   --due-date <YYYY-MM-DD>     Due date (use "none" to clear)
   --project <name>            Project
   -c, --cycle <name>          Cycle
-  --parent <id>               Parent issue ID
+  --parent <id>               Parent issue ID or identifier (e.g., ENG-123)
+  --duplicate-of <id>         Mark as duplicate of issue (sets state and relation)
   -e, --estimate <number>     Story points
   --delegate <emails>         Comma-separated delegates (use "none" to clear)
   --links <ids>               Comma-separated issue IDs to link
+  --json                      Output as JSON
 ```
 
 ### lc issue mine
@@ -67,22 +74,33 @@ lc issue mine [options]
   --json                      Output as JSON
 ```
 
+### lc issue delete
+```bash
+lc issue delete <id> [options]
+  -a, --archive               Archive the issue (default)
+  --permanent                 Permanently delete the issue (cannot be undone)
+  --json                      Output as JSON
+```
+
 ### lc issue batch
 ```bash
 lc issue batch --ids <ids> [options]
   --ids <ids>                 Comma-separated issue IDs (e.g., ENG-123,ENG-124) (required)
+  -s, --state <name>          Set state
+  -a, --assignee <name>       Set assignee
   -c, --cycle <name>          Cycle number or "none" to remove cycle
+  --add-labels <names>        Add labels (preserves existing)
   --dry-run                   Preview changes without updating
   --json                      Output as JSON
 ```
 
 Examples:
 ```bash
+# Update multiple issues at once
+lc issue batch --ids ENG-123,ENG-124 --state "In Progress" --add-labels "urgent"
+
 # Assign multiple issues to a cycle
 lc issue batch --ids ENG-123,ENG-124,ENG-125 --cycle 5
-
-# Remove cycle from issues
-lc issue batch --ids ENG-123,ENG-124 --cycle none
 
 # Preview changes before applying
 lc issue batch --ids ENG-123,ENG-124 --cycle 5 --dry-run
