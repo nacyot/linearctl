@@ -133,7 +133,10 @@ export type AttachmentDeleteFlags = CommonFlags
 
 // Batch update flags
 export interface IssueBatchFlags extends CommonFlags {
+  'add-labels'?: string
+  assignee?: string
   cycle?: string
   'dry-run'?: boolean
   ids: string
+  state?: string
 }

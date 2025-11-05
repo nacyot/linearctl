@@ -38,6 +38,9 @@ describe('issue batch command', () => {
     mockClient = {
       cycles: vi.fn(),
       issue: vi.fn(),
+      issueLabels: vi.fn(),
+      team: vi.fn(),
+      users: vi.fn(),
     }
 
     vi.mocked(linearService.hasApiKey).mockReturnValue(true)
@@ -424,6 +427,202 @@ describe('issue batch command', () => {
       const result = JSON.parse(jsonOutput[0])
       expect(result.succeeded).toEqual(['ENG-123'])
       expect(result.failed).toEqual([])
+    })
+  })
+
+  describe('extended batch updates', () => {
+    it('should update state for multiple issues', async () => {
+      const mockTeam = {
+        id: 'team-1',
+        states: vi.fn().mockResolvedValue({
+          nodes: [{ id: 'state-done', name: 'Done', type: 'completed' }],
+        }),
+      }
+
+      const mockIssues = [
+        {
+          id: 'issue-1',
+          identifier: 'ENG-123',
+          team: Promise.resolve(mockTeam),
+          title: 'Issue 1',
+          update: vi.fn().mockResolvedValue({ success: true }),
+        },
+        {
+          id: 'issue-2',
+          identifier: 'ENG-124',
+          team: Promise.resolve(mockTeam),
+          title: 'Issue 2',
+          update: vi.fn().mockResolvedValue({ success: true }),
+        },
+      ]
+
+      mockClient.issue.mockImplementation((id: string) => {
+        if (id === 'ENG-123') return Promise.resolve(mockIssues[0])
+        if (id === 'ENG-124') return Promise.resolve(mockIssues[1])
+        return Promise.resolve(null)
+      })
+
+      mockClient.team.mockReturnValue(mockTeam)
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+      await cmd.runWithArgs({
+        ids: 'ENG-123,ENG-124',
+        state: 'Done',
+      })
+
+      // Should update both issues with state
+      expect(mockIssues[0].update).toHaveBeenCalledWith({ stateId: 'state-done' })
+      expect(mockIssues[1].update).toHaveBeenCalledWith({ stateId: 'state-done' })
+
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Successfully updated: 2'))
+    })
+
+    it('should update assignee for multiple issues', async () => {
+      const mockIssues = [
+        {
+          id: 'issue-1',
+          identifier: 'ENG-123',
+          team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+          title: 'Issue 1',
+          update: vi.fn().mockResolvedValue({ success: true }),
+        },
+        {
+          id: 'issue-2',
+          identifier: 'ENG-124',
+          team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+          title: 'Issue 2',
+          update: vi.fn().mockResolvedValue({ success: true }),
+        },
+      ]
+
+      mockClient.issue.mockImplementation((id: string) => {
+        if (id === 'ENG-123') return Promise.resolve(mockIssues[0])
+        if (id === 'ENG-124') return Promise.resolve(mockIssues[1])
+        return Promise.resolve(null)
+      })
+
+      mockClient.users.mockResolvedValue({
+        nodes: [{ id: 'user-john', name: 'John Doe' }],
+      })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+      await cmd.runWithArgs({
+        assignee: 'John Doe',
+        ids: 'ENG-123,ENG-124',
+      })
+
+      // Should update both issues with assignee
+      expect(mockIssues[0].update).toHaveBeenCalledWith({ assigneeId: 'user-john' })
+      expect(mockIssues[1].update).toHaveBeenCalledWith({ assigneeId: 'user-john' })
+
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Successfully updated: 2'))
+    })
+
+    it('should add labels for multiple issues', async () => {
+      const mockIssues = [
+        {
+          id: 'issue-1',
+          identifier: 'ENG-123',
+          labels: vi.fn().mockResolvedValue({
+            nodes: [{ id: 'label-bug', name: 'bug' }],
+          }),
+          team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+          title: 'Issue 1',
+          update: vi.fn().mockResolvedValue({ success: true }),
+        },
+        {
+          id: 'issue-2',
+          identifier: 'ENG-124',
+          labels: vi.fn().mockResolvedValue({
+            nodes: [{ id: 'label-feature', name: 'feature' }],
+          }),
+          team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+          title: 'Issue 2',
+          update: vi.fn().mockResolvedValue({ success: true }),
+        },
+      ]
+
+      mockClient.issue.mockImplementation((id: string) => {
+        if (id === 'ENG-123') return Promise.resolve(mockIssues[0])
+        if (id === 'ENG-124') return Promise.resolve(mockIssues[1])
+        return Promise.resolve(null)
+      })
+
+      mockClient.issueLabels.mockResolvedValue({
+        nodes: [{ id: 'label-urgent', name: 'urgent' }],
+      })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+      await cmd.runWithArgs({
+        'add-labels': 'urgent',
+        ids: 'ENG-123,ENG-124',
+      })
+
+      // Should fetch existing labels and merge
+      expect(mockIssues[0].labels).toHaveBeenCalled()
+      expect(mockIssues[1].labels).toHaveBeenCalled()
+
+      // Should update both issues with merged labels
+      expect(mockIssues[0].update).toHaveBeenCalledWith({
+        labelIds: ['label-bug', 'label-urgent'],
+      })
+      expect(mockIssues[1].update).toHaveBeenCalledWith({
+        labelIds: ['label-feature', 'label-urgent'],
+      })
+
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Successfully updated: 2'))
+    })
+
+    it('should support multiple fields at once', async () => {
+      const mockTeam = {
+        id: 'team-1',
+        states: vi.fn().mockResolvedValue({
+          nodes: [{ id: 'state-done', name: 'Done', type: 'completed' }],
+        }),
+      }
+
+      const mockIssue = {
+        id: 'issue-1',
+        identifier: 'ENG-123',
+        labels: vi.fn().mockResolvedValue({
+          nodes: [{ id: 'label-bug', name: 'bug' }],
+        }),
+        team: Promise.resolve(mockTeam),
+        title: 'Issue 1',
+        update: vi.fn().mockResolvedValue({ success: true }),
+      }
+
+      mockClient.issue.mockResolvedValue(mockIssue)
+      mockClient.team.mockReturnValue(mockTeam)
+
+      mockClient.users.mockResolvedValue({
+        nodes: [{ id: 'user-john', name: 'John Doe' }],
+      })
+
+      mockClient.issueLabels.mockResolvedValue({
+        nodes: [{ id: 'label-urgent', name: 'urgent' }],
+      })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+      await cmd.runWithArgs({
+        'add-labels': 'urgent',
+        assignee: 'John Doe',
+        ids: 'ENG-123',
+        state: 'Done',
+      })
+
+      // Should update with all fields
+      expect(mockIssue.update).toHaveBeenCalledWith({
+        assigneeId: 'user-john',
+        labelIds: ['label-bug', 'label-urgent'],
+        stateId: 'state-done',
+      })
+
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Successfully updated: 1'))
     })
   })
 })

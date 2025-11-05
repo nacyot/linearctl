@@ -19,6 +19,13 @@ export default class IssueBatch extends Command {
     '<%= config.bin %> <%= command.id %> --ids ENG-123,ENG-124 --cycle 5 --dry-run',
   ]
   static flags = {
+    'add-labels': Flags.string({
+      description: 'Add labels (preserves existing)',
+    }),
+    assignee: Flags.string({
+      char: 'a',
+      description: 'Assignee name or ID',
+    }),
     cycle: Flags.string({
       char: 'c',
       description: 'Cycle number or "none" to remove cycle',
@@ -35,6 +42,10 @@ export default class IssueBatch extends Command {
       default: false,
       description: 'Output as JSON',
     }),
+    state: Flags.string({
+      char: 's',
+      description: 'State name or ID',
+    }),
   }
 
   async run(): Promise<void> {
@@ -49,8 +60,8 @@ export default class IssueBatch extends Command {
     }
 
     // Validate that at least one update field is provided
-    if (!flags.cycle) {
-      throw new Error('At least one update field is required (e.g., --cycle)')
+    if (!flags.cycle && !flags.state && !flags.assignee && !flags['add-labels']) {
+      throw new Error('At least one update field is required (e.g., --cycle, --state, --assignee)')
     }
 
     const client = getLinearClient()
@@ -80,7 +91,7 @@ export default class IssueBatch extends Command {
     }
 
     // Execute batch update
-    const result = await this.executeBatchUpdate(issues, updatePayload, flags.json || false)
+    const result = await this.executeBatchUpdate(issues, updatePayload, client, flags)
 
     // Output results
     if (flags.json) {
@@ -137,10 +148,46 @@ export default class IssueBatch extends Command {
       }
     }
 
-    // Future: Add more fields here (state, assignee, priority, etc.)
-    // if (flags.state) { ... }
-    // if (flags.assignee) { ... }
-    // if (flags.priority) { ... }
+    // Handle state update
+    if (flags.state !== undefined) {
+      const team = await sampleIssue.team
+      if (!team) {
+        throw new Error('Issue has no team')
+      }
+
+      const states = await team.states()
+      const state = states.nodes.find(
+        (s) => s.name.toLowerCase() === flags.state!.toLowerCase() || s.id === flags.state,
+      )
+
+      if (!state) {
+        throw new Error(`State "${flags.state}" not found`)
+      }
+
+      payload.stateId = state.id
+    }
+
+    // Handle assignee update
+    if (flags.assignee !== undefined) {
+      const users = await client.users({
+        filter: { name: { eqIgnoreCase: flags.assignee } },
+      })
+
+      if (users.nodes.length === 0) {
+        // Try by email
+        const usersByEmail = await client.users({
+          filter: { email: { eq: flags.assignee } },
+        })
+
+        if (usersByEmail.nodes.length === 0) {
+          throw new Error(`Assignee "${flags.assignee}" not found`)
+        }
+
+        payload.assigneeId = usersByEmail.nodes[0].id
+      } else {
+        payload.assigneeId = users.nodes[0].id
+      }
+    }
 
     return payload
   }
@@ -148,16 +195,31 @@ export default class IssueBatch extends Command {
   private async executeBatchUpdate(
     issues: Issue[],
     updatePayload: Record<string, unknown>,
-    isJsonOutput: boolean,
+    client: LinearClient,
+    flags: IssueBatchFlags,
   ): Promise<BatchResult> {
     const result: BatchResult = {
       failed: [],
       succeeded: [],
     }
 
+    // Resolve label IDs if add-labels flag is provided
+    let labelIdsToAdd: string[] = []
+    if (flags['add-labels']) {
+      const labelNames = flags['add-labels'].split(',').map((l) => l.trim())
+      const labelPromises = labelNames.map(async (name) => {
+        const labels = await client.issueLabels({
+          filter: { name: { eqIgnoreCase: name } },
+        })
+        return labels.nodes.length > 0 ? labels.nodes[0].id : null
+      })
+      const resolvedLabels = await Promise.all(labelPromises)
+      labelIdsToAdd = resolvedLabels.filter((id): id is string => id !== null)
+    }
+
     // Progress bar (only if not JSON output)
     let progressBar: cliProgress.SingleBar | null = null
-    if (!isJsonOutput) {
+    if (!flags.json) {
       progressBar = new cliProgress.SingleBar(
         {
           format: 'Updating [{bar}] {percentage}% | {value}/{total} issues',
@@ -170,8 +232,19 @@ export default class IssueBatch extends Command {
     // Process each issue sequentially
     for (const issue of issues) {
       try {
+        // Build per-issue payload
+        const issuePayload = { ...updatePayload }
+
+        // Handle labels per-issue (merge with existing)
+        if (flags['add-labels'] && labelIdsToAdd.length > 0) {
+          // eslint-disable-next-line no-await-in-loop
+          const existingLabels = await issue.labels()
+          const existingLabelIds = existingLabels.nodes.map((l) => l.id)
+          issuePayload.labelIds = [...new Set([...existingLabelIds, ...labelIdsToAdd])]
+        }
+
         // eslint-disable-next-line no-await-in-loop
-        await this.updateIssueWithRetry(issue, updatePayload)
+        await this.updateIssueWithRetry(issue, issuePayload)
         result.succeeded.push(issue.identifier)
       } catch (error) {
         result.failed.push({
@@ -206,6 +279,18 @@ export default class IssueBatch extends Command {
       } else {
         updates.push(`Set cycle to: ${flags.cycle}`)
       }
+    }
+
+    if (flags.state !== undefined) {
+      updates.push(`Set state to: ${flags.state}`)
+    }
+
+    if (flags.assignee !== undefined) {
+      updates.push(`Set assignee to: ${flags.assignee}`)
+    }
+
+    if (flags['add-labels'] !== undefined) {
+      updates.push(`Add labels: ${flags['add-labels']}`)
     }
 
     console.log(chalk.bold('Updates to apply:'))
