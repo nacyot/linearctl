@@ -41,17 +41,21 @@ export interface CreateIssueFlags {
 }
 
 export interface UpdateIssueFlags {
+  'add-labels'?: string
   assignee?: string
   cycle?: string
   delegate?: string
   description?: string
   'due-date'?: string
+  'duplicate-of'?: string
   estimate?: number
+  json?: boolean
   labels?: string
   links?: string
   parent?: string
   priority?: number
   project?: string
+  'remove-labels'?: string
   state?: string
   title?: string
 }

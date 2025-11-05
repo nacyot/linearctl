@@ -1,4 +1,4 @@
-import { Cycle, LinearClient, WorkflowState } from '@linear/sdk'
+import { Cycle, IssueRelationType, LinearClient, WorkflowState } from '@linear/sdk'
 import { Args, Command, Flags } from '@oclif/core'
 import chalk from 'chalk'
 
@@ -19,6 +19,9 @@ static examples = [
     '<%= config.bin %> <%= command.id %> ENG-123 --priority 1 --labels "bug,urgent"',
   ]
 static flags = {
+    'add-labels': Flags.string({
+      description: 'Add labels (preserves existing)',
+    }),
     assignee: Flags.string({
       char: 'a',
       description: 'Assignee name or ID',
@@ -37,13 +40,20 @@ static flags = {
     'due-date': Flags.string({
       description: 'Due date (YYYY-MM-DD)',
     }),
+    'duplicate-of': Flags.string({
+      description: 'Mark as duplicate of issue (sets state and creates link)',
+    }),
     estimate: Flags.integer({
       char: 'e',
       description: 'Estimate value',
     }),
+    json: Flags.boolean({
+      default: false,
+      description: 'Output as JSON',
+    }),
     labels: Flags.string({
       char: 'l',
-      description: 'Comma-separated label names or IDs',
+      description: 'Replace all labels',
     }),
     links: Flags.string({
       description: 'Comma-separated issue IDs to link (e.g. ENG-123,ENG-124)',
@@ -57,6 +67,9 @@ static flags = {
     }),
     project: Flags.string({
       description: 'Project name or ID',
+    }),
+    'remove-labels': Flags.string({
+      description: 'Remove labels (preserves others)',
     }),
     state: Flags.string({
       char: 's',
@@ -156,8 +169,9 @@ static flags = {
         }
       }
 
-      // Resolve and update labels if provided
+      // Handle labels - three modes: replace, add, remove
       if (flags.labels !== undefined) {
+        // Replace mode: completely replace all labels
         if (flags.labels === 'none' || flags.labels === '') {
           input.labelIds = []
         } else {
@@ -173,6 +187,38 @@ static flags = {
         }
 
         hasChanges = true
+      } else if (flags['add-labels'] !== undefined) {
+        // Add mode: preserve existing labels and add new ones
+        const existingLabels = await issue.labels()
+        const existingLabelIds = existingLabels.nodes.map(l => l.id)
+
+        const labelNames = flags['add-labels'].split(',').map((l: string) => l.trim())
+        const newLabelIds = await this.resolveLabelIds(client, labelNames)
+
+        if (newLabelIds.length > 0) {
+          // Merge existing and new labels (remove duplicates)
+          input.labelIds = [...new Set([...existingLabelIds, ...newLabelIds])]
+          hasChanges = true
+        }
+
+        if (newLabelIds.length < labelNames.length) {
+          console.log(chalk.yellow(`Warning: Some labels not found`))
+        }
+      } else if (flags['remove-labels'] !== undefined) {
+        // Remove mode: preserve existing labels except specified ones
+        const existingLabels = await issue.labels()
+        const existingLabelIds = existingLabels.nodes.map(l => l.id)
+
+        const labelNames = flags['remove-labels'].split(',').map((l: string) => l.trim())
+        const removeIds = await this.resolveLabelIds(client, labelNames)
+
+        // Filter out the labels to remove
+        input.labelIds = existingLabelIds.filter(id => !removeIds.includes(id))
+        hasChanges = true
+
+        if (removeIds.length < labelNames.length) {
+          console.log(chalk.yellow(`Warning: Some labels not found`))
+        }
       }
 
       // Update priority if provided
@@ -230,10 +276,51 @@ static flags = {
         hasChanges = true
       }
 
-      // Update parent if provided
+      // Update parent if provided - resolve identifier to UUID
       if (flags.parent !== undefined) {
-        input.parentId = flags.parent === 'none' || flags.parent === '' ? null : flags.parent;
+        if (flags.parent === 'none' || flags.parent === '') {
+          input.parentId = null
+        } else {
+          try {
+            const parentIssue = await client.issue(flags.parent)
+            input.parentId = parentIssue.id
+          } catch {
+            console.log(chalk.yellow(`Warning: Parent issue "${flags.parent}" not found, skipping`))
+          }
+        }
+
         hasChanges = true
+      }
+
+      // Handle duplicate-of flag - create relationship and set state
+      if (flags['duplicate-of'] !== undefined) {
+        try {
+          // Resolve original issue identifier to UUID
+          const originalIssue = await client.issue(flags['duplicate-of'])
+
+          // Create duplicate relationship
+          await client.createIssueRelation({
+            issueId: issue.id,
+            relatedIssueId: originalIssue.id,
+            type: IssueRelationType.Duplicate,
+          })
+
+          // Find and set state to Duplicate or Canceled type
+          const states = await team.states()
+          const duplicateState = states.nodes.find(
+            (s: WorkflowState) =>
+              s.name.toLowerCase() === 'duplicate' ||
+              s.type === 'canceled'
+          )
+
+          if (duplicateState) {
+            input.stateId = duplicateState.id
+          }
+
+          hasChanges = true
+        } catch {
+          console.log(chalk.yellow(`Warning: Could not create duplicate relationship with "${flags['duplicate-of']}"`))
+        }
       }
 
       // Update estimate if provided
@@ -308,22 +395,30 @@ static flags = {
 
       // Check if there are any changes
       if (!hasChanges) {
-        console.log(chalk.yellow('No changes provided'))
+        if (flags.json) {
+          console.log(JSON.stringify({
+            message: 'No changes provided',
+            success: false,
+          }, null, 2))
+        } else {
+          console.log(chalk.yellow('No changes provided'))
+        }
+
         return
       }
 
       // Update the issue
-      console.log(chalk.gray(`Updating issue ${issueId}...`))
+      if (!flags.json) {
+        console.log(chalk.gray(`Updating issue ${issueId}...`))
+      }
+
       const result = await issue.update(input)
 
       if (!result.success) {
         throw new Error('Failed to update issue')
       }
 
-      // Display success message
-      console.log(chalk.green(`\n✓ Issue ${chalk.bold(issue.identifier)} updated successfully!`))
-      
-      // Show what was updated
+      // Build list of updated fields
       const updates = []
       if (input.title !== undefined) updates.push('title')
       if (input.description !== undefined) updates.push('description')
@@ -338,12 +433,24 @@ static flags = {
       if (input.estimate !== undefined) updates.push('estimate')
       if (input.subscriberIds !== undefined) updates.push('delegates')
       if (input.relatedIssueIds !== undefined) updates.push('links')
-      
-      if (updates.length > 0) {
-        console.log(chalk.gray(`Updated: ${updates.join(', ')}`))
+
+      // Display success message
+      if (flags.json) {
+        console.log(JSON.stringify({
+          id: issue.id,
+          identifier: issue.identifier,
+          success: true,
+          updated: updates,
+        }, null, 2))
+      } else {
+        console.log(chalk.green(`\n✓ Issue ${chalk.bold(issue.identifier)} updated successfully!`))
+
+        if (updates.length > 0) {
+          console.log(chalk.gray(`Updated: ${updates.join(', ')}`))
+        }
+
+        console.log('')
       }
-      
-      console.log('')
 
     } catch (error) {
       if (error instanceof Error) {
