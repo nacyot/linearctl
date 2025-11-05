@@ -30,6 +30,7 @@ export interface CreateIssueFlags {
   description?: string
   'due-date'?: string
   estimate?: number
+  json?: boolean
   labels?: string
   links?: string
   parent?: string

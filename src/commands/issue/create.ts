@@ -31,6 +31,10 @@ static flags = {
     'due-date': Flags.string({
       description: 'Due date (YYYY-MM-DD)',
     }),
+    json: Flags.boolean({
+      default: false,
+      description: 'Output as JSON',
+    }),
     labels: Flags.string({
       char: 'l',
       description: 'Comma-separated label names or IDs',
@@ -168,9 +172,14 @@ static flags = {
         }
       }
 
-      // Add parent if provided (direct ID)
+      // Add parent if provided - resolve identifier to UUID
       if (flags.parent) {
-        input.parentId = flags.parent
+        try {
+          const parentIssue = await client.issue(flags.parent)
+          input.parentId = parentIssue.id
+        } catch {
+          console.log(chalk.yellow(`Warning: Parent issue "${flags.parent}" not found, skipping`))
+        }
       }
 
       // Resolve and add delegates if provided
@@ -226,7 +235,10 @@ static flags = {
       }
 
       // Create the issue
-      console.log(chalk.gray('Creating issue...'))
+      if (!flags.json) {
+        console.log(chalk.gray('Creating issue...'))
+      }
+
       const payload = await client.createIssue(input)
 
       if (!payload.success || !payload.issue) {
@@ -234,33 +246,51 @@ static flags = {
       }
 
       const issue = await payload.issue
-      
+
       // Create issue links after issue creation
       if (relatedIssueIds.length > 0) {
-        console.log(chalk.gray('Creating issue links...'))
-        const linkPromises = relatedIssueIds.map(relatedId => 
+        if (!flags.json) {
+          console.log(chalk.gray('Creating issue links...'))
+        }
+
+        const linkPromises = relatedIssueIds.map(relatedId =>
           client.createIssueRelation({
             issueId: issue.id,
             relatedIssueId: relatedId,
             type: IssueRelationType.Related,
           }).catch((error: Error) => {
-            console.log(chalk.yellow(`Warning: Failed to create link: ${error.message}`))
+            if (!flags.json) {
+              console.log(chalk.yellow(`Warning: Failed to create link: ${error.message}`))
+            }
+
             return null
           })
         )
-        
+
         await Promise.all(linkPromises)
-        console.log(chalk.green(`✓ Created ${relatedIssueIds.length} issue link${relatedIssueIds.length === 1 ? '' : 's'}`))
+        if (!flags.json) {
+          console.log(chalk.green(`✓ Created ${relatedIssueIds.length} issue link${relatedIssueIds.length === 1 ? '' : 's'}`))
+        }
       }
 
       // Display success message
-      console.log(chalk.green(`\n✓ Issue ${chalk.bold(issue.identifier)} created successfully!`))
-      console.log(chalk.gray(`Title: ${issue.title}`))
-      if (issue.url) {
-        console.log(chalk.blue(`View: ${issue.url}`))
-      }
+      if (flags.json) {
+        console.log(JSON.stringify({
+          id: issue.id,
+          identifier: issue.identifier,
+          success: true,
+          title: issue.title,
+          url: issue.url,
+        }, null, 2))
+      } else {
+        console.log(chalk.green(`\n✓ Issue ${chalk.bold(issue.identifier)} created successfully!`))
+        console.log(chalk.gray(`Title: ${issue.title}`))
+        if (issue.url) {
+          console.log(chalk.blue(`View: ${issue.url}`))
+        }
 
-      console.log('')
+        console.log('')
+      }
 
     } catch (error) {
       if (error instanceof Error) {

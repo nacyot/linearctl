@@ -21,6 +21,7 @@ describe('issue create command', () => {
     // Create mock client
     mockClient = {
       createIssue: vi.fn(),
+      issue: vi.fn(),
       issueLabels: vi.fn(),
       projects: vi.fn(),
       team: vi.fn(),
@@ -155,13 +156,54 @@ describe('issue create command', () => {
     const mockTeam = { nodes: [{ id: 'team-1', key: 'ENG' }] }
     mockClient.teams.mockResolvedValue(mockTeam)
     mockClient.createIssue.mockRejectedValue(new Error('API error'))
-    
+
     const IssueCreate = (await import('../../../src/commands/issue/create.js')).default
     const cmd = new IssueCreate([], {} as any)
-    
+
     await expect(cmd.runWithFlags({
       team: 'ENG',
       title: 'New feature',
     })).rejects.toThrow('API error')
+  })
+
+  it('should resolve parent issue identifier to UUID', async () => {
+    const mockTeam = { nodes: [{ id: 'team-1', key: 'ENG' }] }
+    const mockParentIssue = {
+      id: 'parent-uuid-123',
+      identifier: 'ENG-100',
+      title: 'Parent issue'
+    }
+    const mockIssue = {
+      id: 'issue-new',
+      identifier: 'ENG-999',
+      title: 'Child issue',
+      url: 'https://linear.app/company/issue/ENG-999',
+    }
+    const mockPayload = {
+      issue: mockIssue,
+      success: true,
+    }
+
+    mockClient.teams.mockResolvedValue(mockTeam)
+    mockClient.issue.mockResolvedValue(mockParentIssue)
+    mockClient.createIssue.mockResolvedValue(mockPayload)
+
+    const IssueCreate = (await import('../../../src/commands/issue/create.js')).default
+    const cmd = new IssueCreate([], {} as any)
+    await cmd.runWithFlags({
+      parent: 'ENG-100',  // Using identifier instead of UUID
+      team: 'ENG',
+      title: 'Child issue',
+    })
+
+    // Verify issue resolution
+    expect(mockClient.issue).toHaveBeenCalledWith('ENG-100')
+
+    // Verify createIssue was called with parent UUID
+    expect(mockClient.createIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parentId: 'parent-uuid-123',  // Resolved UUID
+      })
+    )
   })
 })
