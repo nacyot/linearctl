@@ -67,10 +67,12 @@ static flags = {
           createdAt: issue.createdAt,
           cycle: cycle ? { id: cycle.id, name: cycle.name || '', number: cycle.number || 0 } : null,
           description: issue.description,
+          dueDate: issue.dueDate,
           id: issue.id,
           identifier: issue.identifier,
           labels: labels.nodes.map(l => ({ id: l.id, name: l.name })),
           parent: parent ? { id: parent.id, identifier: parent.identifier } : null,
+          priority: issue.priority,
           project: project ? { id: project.id, name: project.name } : null,
           state: state ? { id: state.id, name: state.name } : null,
           team: team ? { id: team.id, key: team.key, name: team.name } : null,
@@ -80,7 +82,7 @@ static flags = {
         }
         console.log(JSON.stringify(output, null, 2))
       } else {
-        this.displayIssue(issue, { assignee, attachments, children, comments, cycle, labels, parent, project, state, team })
+        this.displayIssue(issue, { assignee, attachments, children, comments, cycle, dueDate: issue.dueDate, labels, parent, priority: issue.priority, project, state, team })
       }
       
     } catch (error) {
@@ -138,17 +140,28 @@ static flags = {
       info.push(`Cycle: ${related.cycle.name}`)
     }
 
+    if (related.priority !== undefined) {
+      const priorityNames = ['None', 'Urgent', 'High', 'Normal', 'Low']
+      info.push(`Priority: ${priorityNames[related.priority]}`)
+    }
+
     console.log(info.join(chalk.gray(' • ')))
-    
+
     // Labels
     if (related.labels && related.labels.nodes.length > 0) {
       const labelNames = related.labels.nodes.map((l) => chalk.magenta(l.name))
       console.log(`Labels: ${labelNames.join(', ')}`)
     }
-    
+
     // Dates
-    console.log(chalk.gray(`Created: ${this.formatDate(issue.createdAt)} • Updated: ${this.formatDate(issue.updatedAt)}`))
-    
+    const dateInfo = [`Created: ${this.formatDate(issue.createdAt)}`, `Updated: ${this.formatDate(issue.updatedAt)}`]
+
+    if (related.dueDate) {
+      dateInfo.push(`Due: ${related.dueDate}`)
+    }
+
+    console.log(chalk.gray(dateInfo.join(' • ')))
+
     // Description
     if (issue.description) {
       console.log(chalk.gray('\n─ Description ─'))
