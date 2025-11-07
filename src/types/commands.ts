@@ -135,8 +135,15 @@ export type AttachmentDeleteFlags = CommonFlags
 export interface IssueBatchFlags extends CommonFlags {
   'add-labels'?: string
   assignee?: string
+  confirm?: boolean
   cycle?: string
   'dry-run'?: boolean
-  ids: string
+  'due-date'?: string
+  ids?: string
+  limit?: number
+  priority?: number
+  project?: string
+  query?: string
+  'remove-labels'?: string
   state?: string
 }

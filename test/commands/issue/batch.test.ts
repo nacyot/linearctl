@@ -381,6 +381,78 @@ describe('issue batch command', () => {
         ids: 'ENG-123',
       })).rejects.toThrow(/Cycle.*not found/)
     })
+
+    it('should require either --ids or --query', async () => {
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+
+      await expect(cmd.runWithArgs({
+        cycle: '5',
+      })).rejects.toThrow(/Either --ids or --query is required/)
+    })
+
+    it('should require at least one update field', async () => {
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+
+      await expect(cmd.runWithArgs({
+        ids: 'ENG-123',
+      })).rejects.toThrow(/At least one update field is required/)
+    })
+
+    it('should handle invalid due date format', async () => {
+      const mockIssue = {
+        id: 'issue-1',
+        identifier: 'ENG-123',
+        team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+        title: 'Issue 1',
+      }
+
+      mockClient.issue.mockResolvedValue(mockIssue)
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+
+      await expect(cmd.runWithArgs({
+        'due-date': 'invalid-date',
+        ids: 'ENG-123',
+      })).rejects.toThrow(/Invalid due date format/)
+    })
+
+    it('should handle project not found', async () => {
+      const mockIssue = {
+        id: 'issue-1',
+        identifier: 'ENG-123',
+        team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+        title: 'Issue 1',
+      }
+
+      mockClient.issue.mockResolvedValue(mockIssue)
+      mockClient.projects = vi.fn().mockResolvedValue({ nodes: [] })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+
+      await expect(cmd.runWithArgs({
+        ids: 'ENG-123',
+        project: 'NonExistent',
+      })).rejects.toThrow(/Project.*not found/)
+    })
+
+    it('should handle query with no matching issues', async () => {
+      mockClient.issues = vi.fn().mockResolvedValue({ nodes: [] })
+      mockClient.workflowStates = vi.fn().mockResolvedValue({
+        nodes: [{ id: 'state-1', name: 'Todo' }],
+      })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+
+      await expect(cmd.runWithArgs({
+        cycle: '5',
+        query: 'state:Todo',
+      })).rejects.toThrow(/No issues found matching query/)
+    })
   })
 
   describe('JSON output', () => {
@@ -622,6 +694,420 @@ describe('issue batch command', () => {
         stateId: 'state-done',
       })
 
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Successfully updated: 1'))
+    })
+
+    it('should update priority for multiple issues', async () => {
+      const mockIssues = [
+        {
+          id: 'issue-1',
+          identifier: 'ENG-123',
+          team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+          title: 'Issue 1',
+          update: vi.fn().mockResolvedValue({ success: true }),
+        },
+        {
+          id: 'issue-2',
+          identifier: 'ENG-124',
+          team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+          title: 'Issue 2',
+          update: vi.fn().mockResolvedValue({ success: true }),
+        },
+      ]
+
+      mockClient.issue.mockImplementation((id: string) => {
+        if (id === 'ENG-123') return Promise.resolve(mockIssues[0])
+        if (id === 'ENG-124') return Promise.resolve(mockIssues[1])
+        return Promise.resolve(null)
+      })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+      await cmd.runWithArgs({
+        ids: 'ENG-123,ENG-124',
+        priority: 1,
+      })
+
+      // Should update both issues with priority
+      expect(mockIssues[0].update).toHaveBeenCalledWith({ priority: 1 })
+      expect(mockIssues[1].update).toHaveBeenCalledWith({ priority: 1 })
+
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Successfully updated: 2'))
+    })
+
+    it('should update due date for multiple issues', async () => {
+      const mockIssues = [
+        {
+          id: 'issue-1',
+          identifier: 'ENG-123',
+          team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+          title: 'Issue 1',
+          update: vi.fn().mockResolvedValue({ success: true }),
+        },
+        {
+          id: 'issue-2',
+          identifier: 'ENG-124',
+          team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+          title: 'Issue 2',
+          update: vi.fn().mockResolvedValue({ success: true }),
+        },
+      ]
+
+      mockClient.issue.mockImplementation((id: string) => {
+        if (id === 'ENG-123') return Promise.resolve(mockIssues[0])
+        if (id === 'ENG-124') return Promise.resolve(mockIssues[1])
+        return Promise.resolve(null)
+      })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+      await cmd.runWithArgs({
+        'due-date': '2025-12-31',
+        ids: 'ENG-123,ENG-124',
+      })
+
+      // Should update both issues with due date
+      expect(mockIssues[0].update).toHaveBeenCalledWith({ dueDate: '2025-12-31' })
+      expect(mockIssues[1].update).toHaveBeenCalledWith({ dueDate: '2025-12-31' })
+
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Successfully updated: 2'))
+    })
+
+    it('should clear due date when "none" is specified', async () => {
+      const mockIssue = {
+        id: 'issue-1',
+        identifier: 'ENG-123',
+        team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+        title: 'Issue 1',
+        update: vi.fn().mockResolvedValue({ success: true }),
+      }
+
+      mockClient.issue.mockResolvedValue(mockIssue)
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+      await cmd.runWithArgs({
+        'due-date': 'none',
+        ids: 'ENG-123',
+      })
+
+      expect(mockIssue.update).toHaveBeenCalledWith({ dueDate: null })
+    })
+
+    it('should update project for multiple issues', async () => {
+      const mockIssues = [
+        {
+          id: 'issue-1',
+          identifier: 'ENG-123',
+          team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+          title: 'Issue 1',
+          update: vi.fn().mockResolvedValue({ success: true }),
+        },
+        {
+          id: 'issue-2',
+          identifier: 'ENG-124',
+          team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+          title: 'Issue 2',
+          update: vi.fn().mockResolvedValue({ success: true }),
+        },
+      ]
+
+      mockClient.issue.mockImplementation((id: string) => {
+        if (id === 'ENG-123') return Promise.resolve(mockIssues[0])
+        if (id === 'ENG-124') return Promise.resolve(mockIssues[1])
+        return Promise.resolve(null)
+      })
+
+      mockClient.projects = vi.fn().mockResolvedValue({
+        nodes: [{ id: 'project-123', name: 'Q4 Launch' }],
+      })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+      await cmd.runWithArgs({
+        ids: 'ENG-123,ENG-124',
+        project: 'Q4 Launch',
+      })
+
+      // Should update both issues with project
+      expect(mockIssues[0].update).toHaveBeenCalledWith({ projectId: 'project-123' })
+      expect(mockIssues[1].update).toHaveBeenCalledWith({ projectId: 'project-123' })
+
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Successfully updated: 2'))
+    })
+
+    it('should remove labels for multiple issues', async () => {
+      const mockIssues = [
+        {
+          id: 'issue-1',
+          identifier: 'ENG-123',
+          labels: vi.fn().mockResolvedValue({
+            nodes: [
+              { id: 'label-bug', name: 'bug' },
+              { id: 'label-urgent', name: 'urgent' },
+            ],
+          }),
+          team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+          title: 'Issue 1',
+          update: vi.fn().mockResolvedValue({ success: true }),
+        },
+        {
+          id: 'issue-2',
+          identifier: 'ENG-124',
+          labels: vi.fn().mockResolvedValue({
+            nodes: [
+              { id: 'label-feature', name: 'feature' },
+              { id: 'label-urgent', name: 'urgent' },
+            ],
+          }),
+          team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+          title: 'Issue 2',
+          update: vi.fn().mockResolvedValue({ success: true }),
+        },
+      ]
+
+      mockClient.issue.mockImplementation((id: string) => {
+        if (id === 'ENG-123') return Promise.resolve(mockIssues[0])
+        if (id === 'ENG-124') return Promise.resolve(mockIssues[1])
+        return Promise.resolve(null)
+      })
+
+      mockClient.issueLabels.mockResolvedValue({
+        nodes: [{ id: 'label-urgent', name: 'urgent' }],
+      })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+      await cmd.runWithArgs({
+        ids: 'ENG-123,ENG-124',
+        'remove-labels': 'urgent',
+      })
+
+      // Should fetch existing labels and remove specified ones
+      expect(mockIssues[0].labels).toHaveBeenCalled()
+      expect(mockIssues[1].labels).toHaveBeenCalled()
+
+      // Should update both issues with labels after removal
+      expect(mockIssues[0].update).toHaveBeenCalledWith({
+        labelIds: ['label-bug'],
+      })
+      expect(mockIssues[1].update).toHaveBeenCalledWith({
+        labelIds: ['label-feature'],
+      })
+
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Successfully updated: 2'))
+    })
+
+    it('should support both add and remove labels at once', async () => {
+      const mockIssue = {
+        id: 'issue-1',
+        identifier: 'ENG-123',
+        labels: vi.fn().mockResolvedValue({
+          nodes: [
+            { id: 'label-bug', name: 'bug' },
+            { id: 'label-old', name: 'old' },
+          ],
+        }),
+        team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+        title: 'Issue 1',
+        update: vi.fn().mockResolvedValue({ success: true }),
+      }
+
+      mockClient.issue.mockResolvedValue(mockIssue)
+
+      mockClient.issueLabels
+        .mockResolvedValueOnce({
+          nodes: [{ id: 'label-urgent', name: 'urgent' }],
+        })
+        .mockResolvedValueOnce({
+          nodes: [{ id: 'label-old', name: 'old' }],
+        })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+      await cmd.runWithArgs({
+        'add-labels': 'urgent',
+        ids: 'ENG-123',
+        'remove-labels': 'old',
+      })
+
+      // Should update with labels: existing + added - removed
+      expect(mockIssue.update).toHaveBeenCalledWith({
+        labelIds: ['label-bug', 'label-urgent'],
+      })
+
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Successfully updated: 1'))
+    })
+  })
+
+  describe('query and limit behavior', () => {
+    beforeEach(() => {
+      mockClient.issues = vi.fn()
+      mockClient.workflowStates = vi.fn()
+      mockClient.teams = vi.fn()
+    })
+
+    it('should respect limit when using query', async () => {
+      // Mock 10 issues returned from query
+      const mockIssues = Array.from({ length: 10 }, (_, i) => ({
+        id: `issue-${i}`,
+        identifier: `ENG-${i}`,
+        team: Promise.resolve({
+          id: 'team-1',
+          key: 'ENG',
+          states: vi.fn().mockResolvedValue({
+            nodes: [{ id: 'state-progress', name: 'In Progress' }],
+          }),
+        }),
+        title: `Issue ${i}`,
+        update: vi.fn().mockResolvedValue({ success: true }),
+      }))
+
+      mockClient.issues.mockResolvedValue({ nodes: mockIssues })
+      mockClient.workflowStates.mockResolvedValue({
+        nodes: [{ id: 'state-1', name: 'Todo' }],
+      })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+
+      await cmd.runWithArgs({
+        json: true,
+        limit: 10,
+        query: 'state:Todo',
+        state: 'In Progress',
+      })
+
+      // Should fetch with limit 10
+      expect(mockClient.issues).toHaveBeenCalledWith({
+        filter: expect.any(Object),
+        first: 10,
+      })
+    })
+
+    it('should use 250 as limit when limit=0 (unlimited)', async () => {
+      mockClient.issues.mockResolvedValue({ nodes: [] })
+      mockClient.workflowStates.mockResolvedValue({
+        nodes: [{ id: 'state-1', name: 'Todo' }],
+      })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+
+      await expect(cmd.runWithArgs({
+        json: true,
+        limit: 0,
+        query: 'state:Todo',
+        state: 'In Progress',
+      })).rejects.toThrow(/No issues found/)
+
+      // Should fetch with max 250
+      expect(mockClient.issues).toHaveBeenCalledWith({
+        filter: expect.any(Object),
+        first: 250,
+      })
+    })
+
+    it('should cap limit at 250 when limit > 250', async () => {
+      mockClient.issues.mockResolvedValue({ nodes: [] })
+      mockClient.workflowStates.mockResolvedValue({
+        nodes: [{ id: 'state-1', name: 'Todo' }],
+      })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+
+      await expect(cmd.runWithArgs({
+        json: true,
+        limit: 500,
+        query: 'state:Todo',
+        state: 'In Progress',
+      })).rejects.toThrow(/No issues found/)
+
+      // Should cap at 250
+      expect(mockClient.issues).toHaveBeenCalledWith({
+        filter: expect.any(Object),
+        first: 250,
+      })
+    })
+
+    it('should handle query with team not found', async () => {
+      mockClient.teams.mockResolvedValue({ nodes: [] })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+
+      await expect(cmd.runWithArgs({
+        cycle: '5',
+        query: 'team:NonExistent',
+      })).rejects.toThrow(/Team.*not found/)
+    })
+
+    it('should handle query with state not found', async () => {
+      mockClient.workflowStates.mockResolvedValue({ nodes: [] })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+
+      await expect(cmd.runWithArgs({
+        cycle: '5',
+        query: 'state:NonExistent',
+      })).rejects.toThrow(/State.*not found/)
+    })
+  })
+
+  describe('label edge cases', () => {
+    it('should handle adding label that does not exist', async () => {
+      const mockIssue = {
+        id: 'issue-1',
+        identifier: 'ENG-123',
+        labels: vi.fn().mockResolvedValue({ nodes: [] }),
+        team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+        title: 'Issue 1',
+        update: vi.fn().mockResolvedValue({ success: true }),
+      }
+
+      mockClient.issue.mockResolvedValue(mockIssue)
+      mockClient.issueLabels.mockResolvedValue({ nodes: [] })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+
+      await cmd.runWithArgs({
+        'add-labels': 'nonexistent',
+        ids: 'ENG-123',
+      })
+
+      // Should still call update but with empty payload (no labels to add)
+      expect(mockIssue.update).toHaveBeenCalledWith({})
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Successfully updated: 1'))
+    })
+
+    it('should handle removing label that does not exist', async () => {
+      const mockIssue = {
+        id: 'issue-1',
+        identifier: 'ENG-123',
+        labels: vi.fn().mockResolvedValue({
+          nodes: [{ id: 'label-1', name: 'bug' }],
+        }),
+        team: Promise.resolve({ id: 'team-1', key: 'ENG' }),
+        title: 'Issue 1',
+        update: vi.fn().mockResolvedValue({ success: true }),
+      }
+
+      mockClient.issue.mockResolvedValue(mockIssue)
+      mockClient.issueLabels.mockResolvedValue({ nodes: [] })
+
+      const IssueBatch = (await import('../../../src/commands/issue/batch.js')).default
+      const cmd = new IssueBatch([], {} as any)
+
+      await cmd.runWithArgs({
+        ids: 'ENG-123',
+        'remove-labels': 'nonexistent',
+      })
+
+      // Should still call update but labels unchanged (label to remove not found)
+      expect(mockIssue.update).toHaveBeenCalledWith({})
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Successfully updated: 1'))
     })
   })

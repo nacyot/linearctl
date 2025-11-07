@@ -85,25 +85,57 @@ lc issue delete <id> [options]
 ### lc issue batch
 ```bash
 lc issue batch --ids <ids> [options]
-  --ids <ids>                 Comma-separated issue IDs (e.g., ENG-123,ENG-124) (required)
+lc issue batch --query <query> [options]
+  # Selection (one required)
+  --ids <ids>                 Comma-separated issue IDs (e.g., ENG-123,ENG-124)
+  --query <query>             Query string (e.g., "state:Todo team:ENG")
+
+  # Update fields
   -s, --state <name>          Set state
   -a, --assignee <name>       Set assignee
   -c, --cycle <name-or-num>   Cycle name, number, or "none" to remove (e.g., "Sprint 1", 1, or "none")
+  -p, --priority <0-4>        Priority (0=None, 1=Urgent, 2=High, 3=Normal, 4=Low)
+  --due-date <YYYY-MM-DD>     Due date or "none" to clear
+  --project <name>            Project name or ID
   --add-labels <names>        Add labels (preserves existing)
+  --remove-labels <names>     Remove specific labels
+
+  # Control
+  --limit <number>            Max issues to update (default: 50, 0=unlimited, only with --query)
+  --confirm                   Skip interactive confirmation (for automation)
   --dry-run                   Preview changes without updating
   --json                      Output as JSON
 ```
 
 Examples:
 ```bash
-# Update multiple issues at once
+# Update specific issues by ID
 lc issue batch --ids ENG-123,ENG-124 --state "In Progress" --add-labels "urgent"
 
-# Assign multiple issues to a cycle
-lc issue batch --ids ENG-123,ENG-124,ENG-125 --cycle 5
+# Query-based update (interactive by default)
+lc issue batch --query "state:Todo team:ENG" --state "In Progress"
+
+# Query with limit and confirmation skip (for automation)
+lc issue batch --query "state:Done" --cycle none --limit 100 --confirm
+
+# Update priority and due date
+lc issue batch --ids ENG-123,ENG-124 --priority 1 --due-date "2025-12-31"
+
+# Add and remove labels
+lc issue batch --query "label:old" --remove-labels "old" --add-labels "archived"
 
 # Preview changes before applying
 lc issue batch --ids ENG-123,ENG-124 --cycle 5 --dry-run
+```
+
+Query Syntax (AND logic only):
+```bash
+# Supported keys: state, team, assignee, label, project, cycle, priority
+# Format: key:value (use quotes for values with spaces)
+
+lc issue batch --query 'state:Todo team:ENG assignee:"John Doe"'
+lc issue batch --query "priority:1 label:bug"
+lc issue batch --query 'state:"In Progress" project:Q4'
 ```
 
 ## Comments
