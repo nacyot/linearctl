@@ -1,6 +1,7 @@
-import { Command, Flags } from '@oclif/core'
+import { Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { CreateLabelFlags } from '../../types/commands.js'
 
@@ -20,7 +21,7 @@ interface LinearError extends Error {
   errors?: GraphQLError[]
 }
 
-export default class LabelCreate extends Command {
+export default class LabelCreate extends BaseCommand {
   static description = 'Create a new issue label'
   static examples = [
     '<%= config.bin %> <%= command.id %> --name "bug" --color "#FF0000" --team ENG',
@@ -28,6 +29,7 @@ export default class LabelCreate extends Command {
     '<%= config.bin %> <%= command.id %> --name "global-label" --color "#0000FF" # Creates workspace label',
   ]
   static flags = {
+    ...BaseCommand.baseFlags,
     color: Flags.string({
       char: 'c',
       description: 'Label color in hex format (#RRGGBB)',
@@ -57,7 +59,7 @@ export default class LabelCreate extends Command {
     await this.runWithFlags(flags)
   }
 
-  async runWithFlags(flags: CreateLabelFlags & {'is-group'?: boolean}): Promise<void> {
+  async runWithFlags(flags: CreateLabelFlags & {'is-group'?: boolean; profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
@@ -68,7 +70,7 @@ export default class LabelCreate extends Command {
       throw new Error('Invalid color format. Please use hex format like #FF0000')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       // Build label input

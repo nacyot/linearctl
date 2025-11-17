@@ -1,7 +1,8 @@
 import { Issue, LinearClient, LinearDocument } from '@linear/sdk'
-import { Command, Flags } from '@oclif/core'
+import { Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { ListFlags } from '../../types/commands.js'
 import { findSimilar, getSuggestionMessage } from '../../utils/fuzzy.js'
@@ -15,7 +16,7 @@ interface EnrichedIssue {
   title: string
 }
 
-export default class IssueList extends Command {
+export default class IssueList extends BaseCommand {
   static description = 'List Linear issues'
 static examples = [
     '<%= config.bin %> <%= command.id %>',
@@ -25,6 +26,7 @@ static examples = [
     '<%= config.bin %> <%= command.id %> --limit 100',
   ]
 static flags = {
+    ...BaseCommand.baseFlags,
     assignee: Flags.string({
       char: 'a',
       description: 'Filter by assignee name or ID',
@@ -79,13 +81,13 @@ static flags = {
     await this.runWithoutParse(flags)
   }
 
-  async runWithoutParse(flags: ListFlags): Promise<void> {
+  async runWithoutParse(flags: ListFlags & { profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       // Build filter

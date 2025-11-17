@@ -1,16 +1,18 @@
-import { Command, Flags } from '@oclif/core'
+import { Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { AttachmentAddFlags } from '../../types/commands.js'
 
-export default class AttachmentAdd extends Command {
+export default class AttachmentAdd extends BaseCommand {
   static description = 'Add a URL-based attachment to a Linear issue'
   static examples = [
     '<%= config.bin %> <%= command.id %> --issue ENG-123 --url https://figma.com/file/123 --title "Design mockup"',
     '<%= config.bin %> <%= command.id %> --issue ENG-123 --url https://github.com/org/repo/pull/456 --title "Related PR" --subtitle "Fix authentication"',
   ]
   static flags = {
+    ...BaseCommand.baseFlags,
     description: Flags.string({
       char: 'd',
       description: 'Attachment description',
@@ -56,13 +58,13 @@ export default class AttachmentAdd extends Command {
     await this.runWithFlags(flags)
   }
 
-  async runWithFlags(flags: AttachmentAddFlags): Promise<void> {
+  async runWithFlags(flags: AttachmentAddFlags & { profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
 
     try {
       // Fetch issue to get internal UUID

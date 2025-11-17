@@ -1,9 +1,10 @@
-import { Args, Command, Flags } from '@oclif/core'
+import { Args, Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 
-export default class IssueDelete extends Command {
+export default class IssueDelete extends BaseCommand {
   static args = {
     issueId: Args.string({
       description: 'Issue identifier (e.g., ENG-123)',
@@ -17,6 +18,7 @@ export default class IssueDelete extends Command {
     '<%= config.bin %> <%= command.id %> ENG-123 --permanent',
   ]
   static flags = {
+    ...BaseCommand.baseFlags,
     archive: Flags.boolean({
       char: 'a',
       default: false,
@@ -37,13 +39,13 @@ export default class IssueDelete extends Command {
     await this.runWithArgs(args.issueId, flags)
   }
 
-  async runWithArgs(issueId: string, flags: { archive?: boolean; json?: boolean; permanent?: boolean } = {}): Promise<void> {
+  async runWithArgs(issueId: string, flags: { archive?: boolean; json?: boolean; permanent?: boolean; profile?: string } = {}): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
 
     try {
       // Get the issue first to resolve identifier to ID

@@ -1,11 +1,12 @@
 import { Cycle, IssueRelationType, LinearClient, LinearDocument, WorkflowState } from '@linear/sdk'
-import { Command, Flags } from '@oclif/core'
+import { Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { CreateIssueFlags } from '../../types/commands.js'
 
-export default class IssueCreate extends Command {
+export default class IssueCreate extends BaseCommand {
   static description = 'Create a new Linear issue'
 static examples = [
     '<%= config.bin %> <%= command.id %> --title "Fix login bug" --team Engineering',
@@ -13,6 +14,7 @@ static examples = [
     '<%= config.bin %> <%= command.id %> --title "Bug" --team ENG --labels "bug,high" --priority 2',
   ]
 static flags = {
+    ...BaseCommand.baseFlags,
     assignee: Flags.string({
       char: 'a',
       description: 'Assignee name or ID',
@@ -72,7 +74,7 @@ static flags = {
     await this.runWithFlags(flags)
   }
 
-  async runWithFlags(flags: CreateIssueFlags): Promise<void> {
+  async runWithFlags(flags: CreateIssueFlags & { profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
@@ -83,7 +85,7 @@ static flags = {
       throw new Error('Team is required. Use --team flag.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       // Resolve team ID

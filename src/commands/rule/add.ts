@@ -1,12 +1,14 @@
-import { Args, Command } from '@oclif/core'
+import { Args } from '@oclif/core'
 import chalk from 'chalk'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { BaseCommand } from '../../base-command.js'
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-export default class RuleAdd extends Command {
+export default class RuleAdd extends BaseCommand {
   static override args = {
     path: Args.string({
       description: 'Path where to copy the Linear CLI guide',

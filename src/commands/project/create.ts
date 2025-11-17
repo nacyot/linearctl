@@ -1,15 +1,17 @@
-import { Command, Flags } from '@oclif/core'
+import { Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { CreateProjectFlags } from '../../types/commands.js'
-export default class ProjectCreate extends Command {
+export default class ProjectCreate extends BaseCommand {
   static description = 'Create a new project'
   static examples = [
     '<%= config.bin %> <%= command.id %> --name "Q2 Planning" --team ENG',
     '<%= config.bin %> <%= command.id %> --name "Product Launch" --team ENG --description "New product launch planning" --state planned',
   ]
   static flags = {
+    ...BaseCommand.baseFlags,
     description: Flags.string({
       char: 'd',
       description: 'Project description',
@@ -49,13 +51,13 @@ export default class ProjectCreate extends Command {
     await this.runWithFlags(flags)
   }
 
-  async runWithFlags(flags: CreateProjectFlags): Promise<void> {
+  async runWithFlags(flags: CreateProjectFlags & { profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       // Resolve team

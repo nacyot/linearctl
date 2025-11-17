@@ -1,7 +1,8 @@
 import { WorkflowState } from '@linear/sdk'
-import { Command, Flags } from '@oclif/core'
+import { Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { ListFlags } from '../../types/commands.js'
 import { formatState, formatTable } from '../../utils/table-formatter.js'
@@ -12,13 +13,14 @@ interface TeamData {
   name: string
 }
 
-export default class StatusList extends Command {
+export default class StatusList extends BaseCommand {
   static description = 'List workflow states for a team'
 static examples = [
     '<%= config.bin %> <%= command.id %> --team ENG',
     '<%= config.bin %> <%= command.id %> --team ENG --json',
   ]
 static flags = {
+    ...BaseCommand.baseFlags,
     json: Flags.boolean({
       default: false,
       description: 'Output as JSON',
@@ -35,13 +37,13 @@ static flags = {
     await this.runWithFlags(flags)
   }
 
-  async runWithFlags(flags: ListFlags): Promise<void> {
+  async runWithFlags(flags: ListFlags & { profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       // Resolve team

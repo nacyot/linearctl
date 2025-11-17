@@ -1,13 +1,14 @@
 import type { Project, Team } from '@linear/sdk'
 
-import { Command, Flags } from '@oclif/core'
+import { Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { ListFlags } from '../../types/commands.js'
 import { formatDate, formatPercent, formatTable } from '../../utils/table-formatter.js'
 
-export default class ProjectList extends Command {
+export default class ProjectList extends BaseCommand {
   static description = 'List projects in your Linear workspace'
 static examples = [
     '<%= config.bin %> <%= command.id %>',
@@ -16,6 +17,7 @@ static examples = [
     '<%= config.bin %> <%= command.id %> --json',
   ]
 static flags = {
+    ...BaseCommand.baseFlags,
     'include-archived': Flags.boolean({
       default: false,
       description: 'Include archived projects',
@@ -48,13 +50,13 @@ static flags = {
     await this.runWithFlags(flags)
   }
 
-  async runWithFlags(flags: ListFlags & {initiative?: string; member?: string}): Promise<void> {
+  async runWithFlags(flags: ListFlags & {initiative?: string; member?: string; profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       // Build options

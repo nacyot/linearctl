@@ -1,10 +1,11 @@
-import { Command, Flags } from '@oclif/core'
+import { Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { formatTable } from '../../utils/table-formatter.js'
 
-export default class LabelList extends Command {
+export default class LabelList extends BaseCommand {
   static description = 'List issue labels in your Linear workspace'
 static examples = [
     '<%= config.bin %> <%= command.id %>',
@@ -12,6 +13,7 @@ static examples = [
     '<%= config.bin %> <%= command.id %> --json',
   ]
 static flags = {
+    ...BaseCommand.baseFlags,
     json: Flags.boolean({
       default: false,
       description: 'Output as JSON',
@@ -32,13 +34,13 @@ static flags = {
     await this.runWithFlags(flags)
   }
 
-  async runWithFlags(flags: {json?: boolean; limit?: number; team?: string}): Promise<void> {
+  async runWithFlags(flags: {json?: boolean; limit?: number; team?: string} & { profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       // Build options

@@ -1,6 +1,7 @@
-import { Command, Flags } from '@oclif/core'
+import { Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { ListFlags } from '../../types/commands.js'
 import { formatDate, formatPercent, formatTable } from '../../utils/table-formatter.js'
@@ -23,7 +24,7 @@ interface TeamData {
   name: string
 }
 
-export default class CycleList extends Command {
+export default class CycleList extends BaseCommand {
   static description = 'List cycles for a team'
 static examples = [
     '<%= config.bin %> <%= command.id %> --team ENG',
@@ -31,6 +32,7 @@ static examples = [
     '<%= config.bin %> <%= command.id %> --team ENG --json',
   ]
 static flags = {
+    ...BaseCommand.baseFlags,
     json: Flags.boolean({
       default: false,
       description: 'Output as JSON',
@@ -57,13 +59,13 @@ static flags = {
     await this.runWithFlags(flags)
   }
 
-  async runWithFlags(flags: ListFlags & {type?: string}): Promise<void> {
+  async runWithFlags(flags: ListFlags & {profile?: string; type?: string;}): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       // Resolve team

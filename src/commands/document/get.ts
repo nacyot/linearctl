@@ -1,11 +1,12 @@
-import { Args, Command, Flags } from '@oclif/core'
+import { Args, Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { CommonFlags } from '../../types/commands.js'
 import { formatDate } from '../../utils/table-formatter.js'
 
-export default class DocumentGet extends Command {
+export default class DocumentGet extends BaseCommand {
   static args = {
     id: Args.string({
       description: 'Document ID or slug',
@@ -20,6 +21,7 @@ static description = 'Get a specific document by ID or slug'
     '<%= config.bin %> <%= command.id %> doc-123 --json',
   ]
   static flags = {
+    ...BaseCommand.baseFlags,
     content: Flags.boolean({
       char: 'c',
       default: false,
@@ -36,7 +38,7 @@ static description = 'Get a specific document by ID or slug'
     await this.runWithArgs([args.id].filter(Boolean) as string[], flags)
   }
 
-  async runWithArgs(args: string[], flags: CommonFlags & {content?: boolean}): Promise<void> {
+  async runWithArgs(args: string[], flags: CommonFlags & {content?: boolean; profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
@@ -47,7 +49,7 @@ static description = 'Get a specific document by ID or slug'
       throw new Error('Document ID or slug is required')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       // Fetch document

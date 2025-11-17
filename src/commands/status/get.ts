@@ -1,6 +1,7 @@
-import { Args, Command, Flags } from '@oclif/core'
+import { Args, Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { CommonFlags } from '../../types/commands.js'
 
@@ -21,7 +22,7 @@ interface WorkflowStateData {
   team: null | Promise<TeamData> | TeamData
   type: string
 }
-export default class StatusGet extends Command {
+export default class StatusGet extends BaseCommand {
   static args = {
     id: Args.string({
       description: 'Workflow state ID',
@@ -35,6 +36,7 @@ static description = 'Get workflow state details by ID or name'
     '<%= config.bin %> <%= command.id %> state-123 --json',
   ]
   static flags = {
+    ...BaseCommand.baseFlags,
     json: Flags.boolean({
       default: false,
       description: 'Output as JSON',
@@ -54,13 +56,13 @@ static description = 'Get workflow state details by ID or name'
     await this.runWithArgs([args.id].filter(Boolean) as string[], flags)
   }
 
-  async runWithArgs(args: string[], flags: CommonFlags & {name?: string; team?: string}): Promise<void> {
+  async runWithArgs(args: string[], flags: CommonFlags & {name?: string; profile?: string; team?: string; }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       let state: WorkflowStateData

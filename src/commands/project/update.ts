@@ -1,10 +1,11 @@
 import { Project } from '@linear/sdk'
-import { Args, Command, Flags } from '@oclif/core'
+import { Args, Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { UpdateProjectFlags } from '../../types/commands.js'
-export default class ProjectUpdate extends Command {
+export default class ProjectUpdate extends BaseCommand {
   static args = {
     identifier: Args.string({
       description: 'Project ID or name',
@@ -17,6 +18,7 @@ export default class ProjectUpdate extends Command {
     '<%= config.bin %> <%= command.id %> project-uuid --name "Updated Name" --description "New description"',
   ]
   static flags = {
+    ...BaseCommand.baseFlags,
     description: Flags.string({
       char: 'd',
       description: 'Project description',
@@ -50,13 +52,13 @@ export default class ProjectUpdate extends Command {
     await this.runWithArgs(args.identifier, flags)
   }
 
-  async runWithArgs(identifier: string, flags: UpdateProjectFlags): Promise<void> {
+  async runWithArgs(identifier: string, flags: UpdateProjectFlags & { profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       // Find the project

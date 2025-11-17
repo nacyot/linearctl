@@ -1,10 +1,11 @@
-import { Args, Command, Flags } from '@oclif/core'
+import { Args, Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { AttachmentListFlags } from '../../types/commands.js'
 
-export default class AttachmentList extends Command {
+export default class AttachmentList extends BaseCommand {
   static args = {
     id: Args.string({
       description: 'Issue ID (e.g., ENG-123)',
@@ -17,6 +18,7 @@ static examples = [
     '<%= config.bin %> <%= command.id %> ENG-123 --json',
   ]
 static flags = {
+    ...BaseCommand.baseFlags,
     json: Flags.boolean({
       default: false,
       description: 'Output as JSON',
@@ -28,13 +30,13 @@ static flags = {
     await this.runWithArgs(args.id, flags)
   }
 
-  async runWithArgs(issueId: string, flags: AttachmentListFlags = {}): Promise<void> {
+  async runWithArgs(issueId: string, flags: AttachmentListFlags & { profile?: string } = {}): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
 
     try {
       // Fetch issue

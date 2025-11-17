@@ -1,9 +1,10 @@
 import { type Issue, type LinearClient, LinearDocument } from '@linear/sdk'
-import { Command, Flags } from '@oclif/core'
+import { Flags } from '@oclif/core'
 import chalk from 'chalk'
 import cliProgress from 'cli-progress'
 import inquirer from 'inquirer'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { IssueBatchFlags } from '../../types/commands.js'
 import { parseQuery } from '../../utils/query-parser.js'
@@ -13,7 +14,7 @@ interface BatchResult {
   succeeded: string[]
 }
 
-export default class IssueBatch extends Command {
+export default class IssueBatch extends BaseCommand {
   static description = 'Update multiple Linear issues at once'
   static examples = [
     '<%= config.bin %> <%= command.id %> --ids ENG-123,ENG-124,ENG-125 --cycle 5',
@@ -21,6 +22,7 @@ export default class IssueBatch extends Command {
     '<%= config.bin %> <%= command.id %> --ids ENG-123,ENG-124 --cycle 5 --dry-run',
   ]
   static flags = {
+    ...BaseCommand.baseFlags,
     'add-labels': Flags.string({
       description: 'Add labels (preserves existing)',
     }),
@@ -83,7 +85,7 @@ export default class IssueBatch extends Command {
     await this.runWithArgs(flags)
   }
 
-  async runWithArgs(flags: IssueBatchFlags): Promise<void> {
+  async runWithArgs(flags: IssueBatchFlags & { profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
@@ -108,7 +110,7 @@ export default class IssueBatch extends Command {
       throw new Error('At least one update field is required (e.g., --cycle, --state, --assignee)')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
 
     // Fetch issues either by IDs or query
     const issues = flags.query

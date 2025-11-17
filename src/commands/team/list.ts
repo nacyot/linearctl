@@ -1,12 +1,13 @@
 import type { LinearDocument, Team } from '@linear/sdk'
 
-import { Command, Flags } from '@oclif/core'
+import { Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { formatTable } from '../../utils/table-formatter.js'
 
-export default class TeamList extends Command {
+export default class TeamList extends BaseCommand {
   static description = 'List all teams in your Linear workspace'
 static examples = [
     '<%= config.bin %> <%= command.id %>',
@@ -15,6 +16,7 @@ static examples = [
     '<%= config.bin %> <%= command.id %> --json',
   ]
 static flags = {
+    ...BaseCommand.baseFlags,
     'include-archived': Flags.boolean({
       default: false,
       description: 'Include archived teams',
@@ -44,13 +46,13 @@ static flags = {
     await this.runWithFlags(flags)
   }
 
-  async runWithFlags(flags: {'include-archived'?: boolean; json?: boolean; limit?: number; 'order-by'?: string; query?: string}): Promise<void> {
+  async runWithFlags(flags: {'include-archived'?: boolean; json?: boolean; limit?: number; 'order-by'?: string; query?: string} & { profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       // Build options

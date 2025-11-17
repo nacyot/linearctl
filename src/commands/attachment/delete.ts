@@ -1,10 +1,11 @@
-import { Args, Command, Flags } from '@oclif/core'
+import { Args, Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { AttachmentDeleteFlags } from '../../types/commands.js'
 
-export default class AttachmentDelete extends Command {
+export default class AttachmentDelete extends BaseCommand {
   static args = {
     id: Args.string({
       description: 'Attachment ID',
@@ -17,6 +18,7 @@ static examples = [
     '<%= config.bin %> <%= command.id %> attachment-uuid-123 --json',
   ]
 static flags = {
+    ...BaseCommand.baseFlags,
     json: Flags.boolean({
       char: 'j',
       default: false,
@@ -29,13 +31,13 @@ static flags = {
     await this.runWithArgs(args.id, flags)
   }
 
-  async runWithArgs(attachmentId: string, flags: AttachmentDeleteFlags = {}): Promise<void> {
+  async runWithArgs(attachmentId: string, flags: AttachmentDeleteFlags & { profile?: string } = {}): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
 
     try {
       // Delete attachment

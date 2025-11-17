@@ -1,11 +1,12 @@
 import type { IssueLabel, Team } from '@linear/sdk'
 
-import { Args, Command, Flags } from '@oclif/core'
+import { Args, Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { CommonFlags } from '../../types/commands.js'
-export default class TeamGet extends Command {
+export default class TeamGet extends BaseCommand {
   static args = {
     identifier: Args.string({
       description: 'Team key, ID, or name',
@@ -19,6 +20,7 @@ static examples = [
     '<%= config.bin %> <%= command.id %> Engineering',
   ]
 static flags = {
+    ...BaseCommand.baseFlags,
     json: Flags.boolean({
       default: false,
       description: 'Output as JSON',
@@ -30,13 +32,13 @@ static flags = {
     await this.runWithArgs(args.identifier, flags)
   }
 
-  async runWithArgs(identifier: string, flags: CommonFlags): Promise<void> {
+  async runWithArgs(identifier: string, flags: CommonFlags & { profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       let team: null | Team = null

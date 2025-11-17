@@ -1,4 +1,4 @@
-import { Command, Flags } from '@oclif/core'
+import { Flags } from '@oclif/core'
 import chalk from 'chalk'
 import mime from 'mime-types'
 import { access, stat } from 'node:fs/promises'
@@ -6,10 +6,11 @@ import path from 'node:path'
 
 import type { AttachmentUploadFlags } from '../../types/commands.js'
 
+import { BaseCommand } from '../../base-command.js'
 import { uploadFile } from '../../lib/upload-file.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 
-export default class AttachmentUpload extends Command {
+export default class AttachmentUpload extends BaseCommand {
   static description = 'Upload a file as an attachment to a Linear issue'
   static examples = [
     '<%= config.bin %> <%= command.id %> --issue ENG-123 --file /path/to/image.png',
@@ -17,6 +18,7 @@ export default class AttachmentUpload extends Command {
     '<%= config.bin %> <%= command.id %> -i ENG-123 -f ./document.pdf --subtitle "Technical specification"',
   ]
   static flags = {
+    ...BaseCommand.baseFlags,
     description: Flags.string({
       char: 'd',
       description: 'Attachment description',
@@ -62,7 +64,7 @@ export default class AttachmentUpload extends Command {
     await this.runWithFlags(flags)
   }
 
-  async runWithFlags(flags: AttachmentUploadFlags): Promise<void> {
+  async runWithFlags(flags: AttachmentUploadFlags & { profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
@@ -75,7 +77,7 @@ export default class AttachmentUpload extends Command {
       throw new Error(`File not found: ${flags.file}`)
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
 
     try {
       // Fetch issue to get internal UUID

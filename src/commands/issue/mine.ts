@@ -1,12 +1,13 @@
 import { Issue, LinearDocument } from '@linear/sdk'
-import { Command, Flags } from '@oclif/core'
+import { Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { ListFlags } from '../../types/commands.js'
 import { formatState, formatTable } from '../../utils/table-formatter.js'
 
-export default class IssueMine extends Command {
+export default class IssueMine extends BaseCommand {
   static description = 'List issues assigned to you'
 static examples = [
     '<%= config.bin %> <%= command.id %>',
@@ -14,6 +15,7 @@ static examples = [
     '<%= config.bin %> <%= command.id %> --json',
   ]
 static flags = {
+    ...BaseCommand.baseFlags,
     'include-archived': Flags.boolean({
       default: false,
       description: 'Include archived issues',
@@ -38,13 +40,13 @@ static flags = {
     await this.runWithFlags(flags)
   }
 
-  async runWithFlags(flags: ListFlags): Promise<void> {
+  async runWithFlags(flags: ListFlags & { profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       // Build filter

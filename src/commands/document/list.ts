@@ -1,7 +1,8 @@
 import { LinearDocument } from '@linear/sdk'
-import { Command, Flags } from '@oclif/core'
+import { Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { ListFlags } from '../../types/commands.js'
 import { formatDate, formatTable, truncateText } from '../../utils/table-formatter.js'
@@ -32,7 +33,7 @@ interface ProcessedDocument {
   url: string
 }
 
-export default class DocumentList extends Command {
+export default class DocumentList extends BaseCommand {
   static description = 'List documents in your Linear workspace'
   static examples = [
     '<%= config.bin %> <%= command.id %>',
@@ -42,6 +43,7 @@ export default class DocumentList extends Command {
     '<%= config.bin %> <%= command.id %> --created-at "-P1D" --json',
   ]
   static flags = {
+    ...BaseCommand.baseFlags,
     'created-at': Flags.string({
       description: 'Filter by creation date (ISO-8601 or duration like -P1D)',
     }),
@@ -83,13 +85,13 @@ export default class DocumentList extends Command {
     await this.runWithFlags(flags)
   }
 
-  async runWithFlags(flags: ListFlags & {creator?: string; initiative?: string}): Promise<void> {
+  async runWithFlags(flags: ListFlags & {creator?: string; initiative?: string; profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       // Build filters

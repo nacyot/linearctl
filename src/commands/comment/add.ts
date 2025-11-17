@@ -1,9 +1,10 @@
-import { Args, Command, Flags } from '@oclif/core'
+import { Args, Flags } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 
-export default class CommentAdd extends Command {
+export default class CommentAdd extends BaseCommand {
   static args = {
     issue: Args.string({
       description: 'Issue ID (e.g., ENG-123)',
@@ -16,6 +17,7 @@ static examples = [
     '<%= config.bin %> <%= command.id %> ENG-123 --body "This is a reply" --parent comment-id',
   ]
 static flags = {
+    ...BaseCommand.baseFlags,
     body: Flags.string({
       char: 'b',
       description: 'Comment body (markdown supported)',
@@ -32,7 +34,7 @@ static flags = {
     await this.runWithArgs(args.issue, flags)
   }
 
-  async runWithArgs(issueId: string, flags: {body: string; parent?: string}): Promise<void> {
+  async runWithArgs(issueId: string, flags: {body: string; parent?: string} & { profile?: string }): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
@@ -43,7 +45,7 @@ static flags = {
       throw new Error('Comment body is required. Use --body flag.')
     }
 
-    const client = getLinearClient()
+    const client = getLinearClient({ profile: flags.profile })
     
     try {
       // Fetch the issue to get its ID
