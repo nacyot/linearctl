@@ -15,24 +15,48 @@ lc init
 
 Linear CLI supports multiple profiles for working with different Linear workspaces (e.g., personal and work accounts):
 
+#### Creating and Managing Profiles
+
 ```bash
 # Initialize profiles
 lc init --profile work
 lc init --profile personal
 
+# List all profiles
+lc profile list
+
+# Set default profile
+lc profile set-default work
+
+# Delete a profile
+lc profile delete personal
+```
+
+#### Using Profiles with Commands
+
+```bash
 # Use with any command
 lc issue list --profile work
 lc issue create --title "Task" --profile personal
 lc doctor --profile work
+
+# All commands support --profile flag
+lc issue list --profile work
+lc team list --profile personal
+lc project create --profile work --name "Q1 Goals"
 ```
 
-**Profile Priority Order:**
-1. `--profile` flag (highest priority) - explicitly select a profile
-2. `LINEAR_API_KEY` environment variable - override with direct API key
-3. `LINEAR_PROFILE` environment variable - select default profile
-4. Default profile (lowest priority) - first initialized profile
+#### Profile Priority Order
 
-Examples:
+When determining which API key to use, Linear CLI follows this priority order:
+
+1. **`--profile` flag** (highest priority) - explicitly select a profile
+2. **`LINEAR_API_KEY` environment variable** - override with direct API key
+3. **`LINEAR_PROFILE` environment variable** - select default profile
+4. **Default profile** (lowest priority) - first initialized profile
+
+#### Priority Examples
+
 ```bash
 # Use explicit profile (overrides everything else)
 lc issue list --profile work
@@ -50,7 +74,32 @@ export LINEAR_API_KEY=lin_api_xxx
 lc issue list --profile personal  # Uses personal profile API key
 ```
 
-**Note:** All commands support the `--profile` flag. The first initialized profile automatically becomes the default profile.
+#### Migration from Single API Key
+
+**No action required!** If you're upgrading from a previous version, your existing API key will be automatically migrated to a profile named `default` on first run. Your CLI will continue working exactly as before.
+
+**Note:** All commands support the `--profile` flag.
+
+### Global Flags
+
+The following flags are available for **all commands**:
+
+```bash
+--profile <name>    Use specific profile instead of default
+--help              Show help for the command
+```
+
+**Note:** The `--profile` flag should be placed **after** the command (similar to AWS CLI style), not before:
+
+```bash
+# ✅ Correct
+lc issue list --profile work
+lc team get --profile personal "Engineering"
+lc project create --profile work --name "New Project"
+
+# ❌ Incorrect
+lc --profile work issue list
+```
 
 ## Issues
 
@@ -92,6 +141,25 @@ the CLI will suggest similar items (e.g., "Shooping" → "Shopping").
 ### lc issue get
 ```bash
 lc issue get <id> [--json]
+lc issue get <id1> <id2> <id3> [--json]
+lc issue get <id1>,<id2>,<id3> [--json]
+```
+
+Fetch details of one or more issues. Supports both space-separated and comma-separated issue IDs for batch operations.
+
+Examples:
+```bash
+# Single issue
+lc issue get ENG-123
+
+# Multiple issues (space-separated)
+lc issue get ENG-123 ENG-124 ENG-125
+
+# Multiple issues (comma-separated)
+lc issue get ENG-123,ENG-124,ENG-125
+
+# JSON output for multiple issues
+lc issue get ENG-123,ENG-124 --json
 ```
 
 ### lc issue create
@@ -487,6 +555,59 @@ lc doctor
 
 # Check specific profile
 lc doctor --profile work
+```
+
+### lc profile
+
+Manage profiles for multiple Linear workspaces.
+
+#### lc profile list
+```bash
+lc profile list [options]
+  --json                      Output as JSON
+```
+
+List all configured profiles with default indicator.
+
+Examples:
+```bash
+# List all profiles
+lc profile list
+
+# JSON output
+lc profile list --json
+```
+
+#### lc profile set-default
+```bash
+lc profile set-default <name>
+```
+
+Set the default profile to use when no --profile flag is specified.
+
+Examples:
+```bash
+# Set work as default profile
+lc profile set-default work
+
+# Set personal as default
+lc profile set-default personal
+```
+
+#### lc profile delete
+```bash
+lc profile delete <name>
+```
+
+Delete a profile. Requires confirmation.
+
+Examples:
+```bash
+# Delete work profile
+lc profile delete work
+
+# Delete personal profile
+lc profile delete personal
 ```
 
 ### lc version

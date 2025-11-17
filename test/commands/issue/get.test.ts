@@ -20,9 +20,12 @@ describe('issue get command', () => {
     
     // Create mock client
     mockClient = {
+      client: {
+        request: vi.fn(),
+      },
       issue: vi.fn(),
     }
-    
+
     vi.mocked(linearService.hasApiKey).mockReturnValue(true)
     vi.mocked(linearService.getLinearClient).mockReturnValue(mockClient)
   })
@@ -103,9 +106,126 @@ describe('issue get command', () => {
     const cmd = new IssueGet(['ENG-123'], {} as any)
     await cmd.runWithArgs('ENG-123', { json: true })
     
-    const jsonOutput = logSpy.mock.calls.find(call => 
+    const jsonOutput = logSpy.mock.calls.find(call =>
       call[0].includes('ENG-123')
     )
     expect(jsonOutput).toBeTruthy()
+  })
+
+  it('should fetch multiple issues in parallel', async () => {
+    const mockIssue1 = {
+      assignee: Promise.resolve({ name: 'John Doe' }),
+      attachments: vi.fn().mockResolvedValue({ nodes: [] }),
+      children: vi.fn().mockResolvedValue({ nodes: [] }),
+      comments: vi.fn().mockResolvedValue({ nodes: [] }),
+      createdAt: new Date('2024-01-01'),
+      cycle: Promise.resolve(null),
+      description: 'First issue',
+      id: 'issue-1',
+      identifier: 'ENG-123',
+      labels: vi.fn().mockResolvedValue({ nodes: [{ name: 'bug' }] }),
+      parent: Promise.resolve(null),
+      priority: 1,
+      project: Promise.resolve(null),
+      state: Promise.resolve({ name: 'In Progress', type: 'started' }),
+      team: Promise.resolve({ key: 'ENG', name: 'Engineering' }),
+      title: 'Issue 1',
+      updatedAt: new Date('2024-01-01'),
+      url: 'https://linear.app/company/issue/ENG-123',
+    }
+
+    const mockIssue2 = {
+      assignee: Promise.resolve(null),
+      attachments: vi.fn().mockResolvedValue({ nodes: [] }),
+      children: vi.fn().mockResolvedValue({ nodes: [] }),
+      comments: vi.fn().mockResolvedValue({ nodes: [] }),
+      createdAt: new Date('2024-01-02'),
+      cycle: Promise.resolve(null),
+      description: 'Second issue',
+      id: 'issue-2',
+      identifier: 'ENG-124',
+      labels: vi.fn().mockResolvedValue({ nodes: [] }),
+      parent: Promise.resolve(null),
+      priority: 2,
+      project: Promise.resolve(null),
+      state: Promise.resolve({ name: 'Todo', type: 'unstarted' }),
+      team: Promise.resolve({ key: 'ENG', name: 'Engineering' }),
+      title: 'Issue 2',
+      updatedAt: new Date('2024-01-02'),
+      url: 'https://linear.app/company/issue/ENG-124',
+    }
+
+    mockClient.issue.mockResolvedValueOnce(mockIssue1).mockResolvedValueOnce(mockIssue2)
+
+    const IssueGet = (await import('../../../src/commands/issue/get.js')).default
+    const cmd = new IssueGet(['ENG-123', 'ENG-124'], {} as any)
+    await cmd.runWithMultipleArgs(['ENG-123', 'ENG-124'], {})
+
+    // Verify both issues were fetched
+    expect(mockClient.issue).toHaveBeenCalledTimes(2)
+    expect(mockClient.issue).toHaveBeenCalledWith('ENG-123')
+    expect(mockClient.issue).toHaveBeenCalledWith('ENG-124')
+
+    // Verify both issues were displayed
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('ENG-123'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Issue 1'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('ENG-124'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Issue 2'))
+  })
+
+  it('should output JSON for multiple issues', async () => {
+    const mockIssue1 = {
+      assignee: Promise.resolve(null),
+      attachments: vi.fn().mockResolvedValue({ nodes: [] }),
+      children: vi.fn().mockResolvedValue({ nodes: [] }),
+      comments: vi.fn().mockResolvedValue({ nodes: [] }),
+      createdAt: new Date('2024-01-01'),
+      cycle: Promise.resolve(null),
+      description: 'First issue',
+      id: 'issue-1',
+      identifier: 'ENG-123',
+      labels: vi.fn().mockResolvedValue({ nodes: [] }),
+      parent: Promise.resolve(null),
+      priority: 0,
+      project: Promise.resolve(null),
+      state: Promise.resolve({ id: 'state-1', name: 'Todo', type: 'unstarted' }),
+      team: Promise.resolve({ id: 'team-1', key: 'ENG', name: 'Engineering' }),
+      title: 'Issue 1',
+      updatedAt: new Date('2024-01-01'),
+      url: 'https://linear.app/company/issue/ENG-123',
+    }
+
+    const mockIssue2 = {
+      assignee: Promise.resolve(null),
+      attachments: vi.fn().mockResolvedValue({ nodes: [] }),
+      children: vi.fn().mockResolvedValue({ nodes: [] }),
+      comments: vi.fn().mockResolvedValue({ nodes: [] }),
+      createdAt: new Date('2024-01-02'),
+      cycle: Promise.resolve(null),
+      description: 'Second issue',
+      id: 'issue-2',
+      identifier: 'ENG-124',
+      labels: vi.fn().mockResolvedValue({ nodes: [] }),
+      parent: Promise.resolve(null),
+      priority: 0,
+      project: Promise.resolve(null),
+      state: Promise.resolve({ id: 'state-2', name: 'Todo', type: 'unstarted' }),
+      team: Promise.resolve({ id: 'team-1', key: 'ENG', name: 'Engineering' }),
+      title: 'Issue 2',
+      updatedAt: new Date('2024-01-02'),
+      url: 'https://linear.app/company/issue/ENG-124',
+    }
+
+    mockClient.issue.mockResolvedValueOnce(mockIssue1).mockResolvedValueOnce(mockIssue2)
+
+    const IssueGet = (await import('../../../src/commands/issue/get.js')).default
+    const cmd = new IssueGet(['ENG-123', 'ENG-124'], {} as any)
+    await cmd.runWithMultipleArgs(['ENG-123', 'ENG-124'], { json: true })
+
+    // Verify JSON output is array
+    const jsonCall = logSpy.mock.calls.find(call => call[0].includes('['))
+    expect(jsonCall).toBeTruthy()
+    expect(jsonCall![0]).toContain('ENG-123')
+    expect(jsonCall![0]).toContain('ENG-124')
   })
 })
