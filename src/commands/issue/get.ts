@@ -1,6 +1,5 @@
 import { Args, Flags } from '@oclif/core'
 import chalk from 'chalk'
-import { gql } from 'graphql-tag'
 
 import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
@@ -33,141 +32,9 @@ static flags = {
     // Parse issue IDs - support both comma and space separated
     const issueIds = args.ids.split(/[,\s]+/).filter(Boolean)
 
-    if (issueIds.length === 1) {
-      await this.runWithArgs(issueIds[0], flags)
-    } else {
-      await this.runWithMultipleArgs(issueIds, flags)
-    }
-  }
-
-  async runWithMultipleArgs(issueIds: string[], flags: CommonFlags & { profile?: string } = {}): Promise<void> {
-    // Check API key
-    if (!hasApiKey()) {
-      throw new Error('No API key configured. Run "lc init" first.')
-    }
-
-    const client = getLinearClient({ profile: flags.profile })
-
-    try {
-      // Fetch all issues in parallel (N API calls instead of N×11)
-      const issuePromises = issueIds.map(async (issueId) => {
-        try {
-          const issue = await client.issue(issueId)
-
-          if (!issue) {
-            return null
-          }
-
-          // Fetch related data in parallel for this issue
-          const [state, assignee, team, labels, project, parent, children, comments, attachments, cycle] =
-            await Promise.all([
-              issue.state,
-              issue.assignee,
-              issue.team,
-              issue.labels(),
-              issue.project,
-              issue.parent,
-              issue.children(),
-              issue.comments(),
-              issue.attachments(),
-              issue.cycle,
-            ])
-
-          return {
-            assignee,
-            attachments,
-            children,
-            comments,
-            createdAt: issue.createdAt,
-            cycle,
-            description: issue.description,
-            dueDate: issue.dueDate,
-            id: issue.id,
-            identifier: issue.identifier,
-            labels,
-            parent,
-            priority: issue.priority,
-            project,
-            state,
-            team,
-            title: issue.title,
-            updatedAt: issue.updatedAt,
-            url: issue.url,
-          }
-        } catch (error) {
-          return null
-        }
-      })
-
-      const issueResults = await Promise.all(issuePromises)
-      const issues = issueResults.filter((issue): issue is NonNullable<typeof issue> => issue !== null)
-
-      if (issues.length === 0) {
-        throw new Error(`No issues found for IDs: ${issueIds.join(', ')}`)
-      }
-
-      // Warn if some issues were not found
-      if (issues.length < issueIds.length) {
-        const foundIds = issues.map(i => i.identifier)
-        const notFound = issueIds.filter(id => !foundIds.includes(id))
-        console.warn(chalk.yellow(`⚠️  Issues not found: ${notFound.join(', ')}`))
-        console.log('')
-      }
-
-      // Output results
-      if (flags.json) {
-        const output = issues.map(issue => ({
-          assignee: issue.assignee ? { id: issue.assignee.id, name: issue.assignee.name } : null,
-          attachments: issue.attachments.nodes.map(a => ({ id: a.id, title: a.title, url: a.url })),
-          children: issue.children.nodes.map(c => ({ id: c.id, identifier: c.identifier })),
-          comments: issue.comments.nodes.length,
-          createdAt: issue.createdAt,
-          cycle: issue.cycle ? { id: issue.cycle.id, name: issue.cycle.name || '', number: issue.cycle.number || 0 } : null,
-          description: issue.description,
-          dueDate: issue.dueDate,
-          id: issue.id,
-          identifier: issue.identifier,
-          labels: issue.labels.nodes.map(l => ({ id: l.id, name: l.name })),
-          parent: issue.parent ? { id: issue.parent.id, identifier: issue.parent.identifier } : null,
-          priority: issue.priority,
-          project: issue.project ? { id: issue.project.id, name: issue.project.name } : null,
-          state: issue.state ? { id: issue.state.id, name: issue.state.name } : null,
-          team: issue.team ? { id: issue.team.id, key: issue.team.key, name: issue.team.name } : null,
-          title: issue.title,
-          updatedAt: issue.updatedAt,
-          url: issue.url,
-        }))
-        console.log(JSON.stringify(output, null, 2))
-      } else {
-        // Display each issue
-        for (const [index, issue] of issues.entries()) {
-          if (index > 0) {
-            console.log(chalk.gray('\n' + '='.repeat(80) + '\n'))
-          }
-
-          this.displayIssue(issue, {
-            assignee: issue.assignee || undefined,
-            attachments: issue.attachments,
-            children: issue.children,
-            comments: issue.comments,
-            cycle: issue.cycle || undefined,
-            dueDate: issue.dueDate,
-            labels: issue.labels,
-            parent: issue.parent || undefined,
-            priority: issue.priority,
-            project: issue.project || undefined,
-            state: issue.state || undefined,
-            team: issue.team || undefined,
-          })
-        }
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-
-      throw new Error(`Failed to fetch issues: ${issueIds.join(', ')}`)
-    }
+    await (issueIds.length === 1
+      ? this.runWithArgs(issueIds[0], flags)
+      : this.runWithMultipleArgs(issueIds, flags))
   }
 
   async runWithArgs(issueId: string, flags: CommonFlags & { profile?: string } = {}): Promise<void> {
@@ -234,6 +101,136 @@ static flags = {
       }
 
       throw new Error(`Failed to fetch issue ${issueId}`)
+    }
+  }
+
+  async runWithMultipleArgs(issueIds: string[], flags: CommonFlags & { profile?: string } = {}): Promise<void> {
+    // Check API key
+    if (!hasApiKey()) {
+      throw new Error('No API key configured. Run "lc init" first.')
+    }
+
+    const client = getLinearClient({ profile: flags.profile })
+
+    try {
+      // Fetch all issues in parallel (N API calls instead of N×11)
+      const issuePromises = issueIds.map(async (issueId) => {
+        try {
+          const issue = await client.issue(issueId)
+
+          if (!issue) {
+            return null
+          }
+
+          // Fetch related data in parallel for this issue
+          const [state, assignee, team, labels, project, parent, children, comments, attachments, cycle] =
+            await Promise.all([
+              issue.state,
+              issue.assignee,
+              issue.team,
+              issue.labels(),
+              issue.project,
+              issue.parent,
+              issue.children(),
+              issue.comments(),
+              issue.attachments(),
+              issue.cycle,
+            ])
+
+          return {
+            assignee,
+            attachments,
+            children,
+            comments,
+            createdAt: issue.createdAt,
+            cycle,
+            description: issue.description,
+            dueDate: issue.dueDate,
+            id: issue.id,
+            identifier: issue.identifier,
+            labels,
+            parent,
+            priority: issue.priority,
+            project,
+            state,
+            team,
+            title: issue.title,
+            updatedAt: issue.updatedAt,
+            url: issue.url,
+          }
+        } catch {
+          return null
+        }
+      })
+
+      const issueResults = await Promise.all(issuePromises)
+      const issues = issueResults.filter((issue): issue is NonNullable<typeof issue> => issue !== null)
+
+      if (issues.length === 0) {
+        throw new Error(`No issues found for IDs: ${issueIds.join(', ')}`)
+      }
+
+      // Warn if some issues were not found
+      if (issues.length < issueIds.length) {
+        const foundIds = new Set(issues.map(i => i.identifier))
+        const notFound = issueIds.filter(id => !foundIds.has(id))
+        console.warn(chalk.yellow(`⚠️  Issues not found: ${notFound.join(', ')}`))
+        console.log('')
+      }
+
+      // Output results
+      if (flags.json) {
+        const output = issues.map(issue => ({
+          assignee: issue.assignee ? { id: issue.assignee.id, name: issue.assignee.name } : null,
+          attachments: issue.attachments.nodes.map(a => ({ id: a.id, title: a.title, url: a.url })),
+          children: issue.children.nodes.map(c => ({ id: c.id, identifier: c.identifier })),
+          comments: issue.comments.nodes.length,
+          createdAt: issue.createdAt,
+          cycle: issue.cycle ? { id: issue.cycle.id, name: issue.cycle.name || '', number: issue.cycle.number || 0 } : null,
+          description: issue.description,
+          dueDate: issue.dueDate,
+          id: issue.id,
+          identifier: issue.identifier,
+          labels: issue.labels.nodes.map(l => ({ id: l.id, name: l.name })),
+          parent: issue.parent ? { id: issue.parent.id, identifier: issue.parent.identifier } : null,
+          priority: issue.priority,
+          project: issue.project ? { id: issue.project.id, name: issue.project.name } : null,
+          state: issue.state ? { id: issue.state.id, name: issue.state.name } : null,
+          team: issue.team ? { id: issue.team.id, key: issue.team.key, name: issue.team.name } : null,
+          title: issue.title,
+          updatedAt: issue.updatedAt,
+          url: issue.url,
+        }))
+        console.log(JSON.stringify(output, null, 2))
+      } else {
+        // Display each issue
+        for (const [index, issue] of issues.entries()) {
+          if (index > 0) {
+            console.log(chalk.gray('\n' + '='.repeat(80) + '\n'))
+          }
+
+          this.displayIssue(issue, {
+            assignee: issue.assignee || undefined,
+            attachments: issue.attachments,
+            children: issue.children,
+            comments: issue.comments,
+            cycle: issue.cycle || undefined,
+            dueDate: issue.dueDate,
+            labels: issue.labels,
+            parent: issue.parent || undefined,
+            priority: issue.priority,
+            project: issue.project || undefined,
+            state: issue.state || undefined,
+            team: issue.team || undefined,
+          })
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error
+      }
+
+      throw new Error(`Failed to fetch issues: ${issueIds.join(', ')}`)
     }
   }
 
