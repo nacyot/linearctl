@@ -307,6 +307,10 @@ static flags = {
               id
               identifier
               title
+              description
+              priority
+              estimate
+              dueDate
               createdAt
               updatedAt
               assignee {
@@ -331,8 +335,12 @@ static flags = {
             nodes: Array<{
               assignee: null | { email: string; id: string; name: string }
               createdAt: Date
+              description?: string
+              dueDate?: string
+              estimate?: number
               id: string
               identifier: string
+              priority: number
               state: { color: string; id: string; name: string; type: string }
               title: string
               updatedAt: Date
