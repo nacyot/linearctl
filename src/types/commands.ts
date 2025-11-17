@@ -4,6 +4,22 @@ export interface CommonFlags {
   json?: boolean
 }
 
+// Profile configuration types
+export interface ProfileConfig {
+  apiKey: string
+  name?: string
+}
+
+export interface ConfigSchema {
+  // Legacy fields (for migration)
+  apiKey?: string
+  currentKey?: string
+
+  // New profile-based structure
+  defaultProfile?: string
+  profiles?: Record<string, ProfileConfig>
+}
+
 export interface ListFlags extends CommonFlags {
   assignee?: string
   'created-at'?: string
