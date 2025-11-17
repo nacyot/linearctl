@@ -1,7 +1,7 @@
 {
   "name": "linearctl",
   "description": "Linear CLI - Developer-friendly Linear API client",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "author": "nacyot",
   "bin": {
     "linearctl": "./bin/run.js",
