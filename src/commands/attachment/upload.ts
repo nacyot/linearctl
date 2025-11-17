@@ -114,9 +114,19 @@ export default class AttachmentUpload extends BaseCommand {
         console.log(chalk.gray('Uploading file...'))
       }
 
+      // Build headers array with content-type
+      const uploadHeaders = uploadResult.uploadFile?.headers
+        ? uploadResult.uploadFile.headers.map(h => ({ key: h.key, value: h.value }))
+        : []
+
+      // Add content-type header if not already present (required for S3 signature validation)
+      if (!uploadHeaders.some(h => h.key.toLowerCase() === 'content-type')) {
+        uploadHeaders.push({ key: 'Content-Type', value: contentType })
+      }
+
       await uploadFile({
         filePath: flags.file,
-        headers: uploadResult.uploadFile?.headers ? uploadResult.uploadFile.headers.map(h => ({ key: h.key, value: h.value })) : [],
+        headers: uploadHeaders,
         uploadUrl: uploadResult.uploadFile?.uploadUrl || '',
       })
 
