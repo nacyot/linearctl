@@ -46,24 +46,37 @@ describe('Linear Service', () => {
   describe('getLinearClient', () => {
     it('should create a LinearClient with API key from environment', () => {
       process.env.LINEAR_API_KEY = 'test-api-key'
-      
+
       const client = getLinearClient()
-      
+
       expect(LinearClient).toHaveBeenCalledWith({ apiKey: 'test-api-key' })
       expect(client).toBeDefined()
     })
 
-    it('should create a LinearClient with stored API key when env is not set', () => {
-      // 저장된 키를 사용하는 케이스는 setApiKey 구현 후 테스트
-      setApiKey('stored-api-key')
-      
+    it('should create a LinearClient with stored profile when env is not set', () => {
+      setApiKey('stored-api-key', 'default')
+
       getLinearClient()
-      
+
       expect(LinearClient).toHaveBeenCalledWith({ apiKey: 'stored-api-key' })
+    })
+
+    it('should create a LinearClient with specific profile', () => {
+      setApiKey('personal-key', 'personal')
+      setApiKey('company-key', 'company')
+
+      const client = getLinearClient({ profile: 'company' })
+
+      expect(LinearClient).toHaveBeenCalledWith({ apiKey: 'company-key' })
+      expect(client).toBeDefined()
     })
 
     it('should throw error when no API key is available', () => {
       expect(() => getLinearClient()).toThrow(/API key/)
+    })
+
+    it('should throw error when profile does not exist', () => {
+      expect(() => getLinearClient({ profile: 'nonexistent' })).toThrow(/API key/)
     })
   })
 
