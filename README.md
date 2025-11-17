@@ -30,12 +30,20 @@ Linear CLI supports multiple profiles for managing different Linear workspaces:
 lc init --profile work
 lc init --profile personal
 
+# List all profiles
+lc profile list
+
+# Set default profile
+lc profile set-default work
+
+# Delete a profile
+lc profile delete personal
+
 # Use specific profile with any command
 lc issue list --profile work
 lc issue create --title "Task" --profile personal
 
-# Set default profile (first initialized profile becomes default)
-# You can also use LINEAR_PROFILE environment variable
+# Or use environment variable
 export LINEAR_PROFILE=work
 lc issue list  # Uses work profile
 ```
