@@ -1,28 +1,28 @@
-import { Command } from '@oclif/core'
 import chalk from 'chalk'
 
+import { BaseCommand } from '../base-command.js'
 import { getApiKey, getLinearClient, hasApiKey, testConnection } from '../services/linear.js'
 
-export default class Doctor extends Command {
+export default class Doctor extends BaseCommand {
   static description = 'Check Linear CLI configuration and connection'
 static examples = [
     '<%= config.bin %> <%= command.id %>',
   ]
 
   async run(): Promise<void> {
-    await this.parse(Doctor)
-    await this.runWithoutParse()
+    const { flags } = await this.parse(Doctor)
+    await this.runWithoutParse(flags.profile)
   }
 
-  async runWithoutParse(): Promise<void> {
+  async runWithoutParse(profile?: string): Promise<void> {
     this.log(chalk.bold('\n🔍 Linear CLI Doctor\n'))
-    
+
     // Check API Key
     this.log(chalk.gray('Checking configuration...'))
-    
-    const hasKey = hasApiKey()
-    const apiKey = getApiKey()
-    
+
+    const hasKey = hasApiKey(profile)
+    const apiKey = getApiKey(profile)
+
     if (!hasKey || !apiKey) {
       this.log(`${chalk.red('✗')} API Key: ${chalk.red('Not configured')}`)
       this.log(chalk.yellow('\n  Run "lc init" to set up your API key'))
@@ -32,13 +32,13 @@ static examples = [
     // Display masked API key
     const maskedKey = apiKey.slice(0, 12) + '...' + apiKey.slice(Math.max(0, apiKey.length - 4))
     this.log(`${chalk.green('✓')} API Key: ${chalk.gray(maskedKey)}`)
-    
+
     // Test connection
     this.log(chalk.gray('\nTesting connection...'))
-    
+
     try {
-      const isValid = await testConnection()
-      
+      const isValid = await testConnection(profile)
+
       if (!isValid) {
         this.log(`${chalk.red('✗')} Connection: ${chalk.red('Failed')}`)
         this.log(chalk.yellow('\n  Your API key appears to be invalid'))
@@ -47,7 +47,7 @@ static examples = [
       }
 
       // Get user info
-      const client = getLinearClient()
+      const client = getLinearClient({ profile })
       const viewer = await client.viewer
       
       this.log(`${chalk.green('✓')} Connection: ${chalk.green('Success')}`)
