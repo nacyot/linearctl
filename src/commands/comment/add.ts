@@ -46,38 +46,31 @@ static flags = {
     }
 
     const client = getLinearClient({ profile: flags.profile })
-    
+
     try {
-      // Fetch the issue to get its ID
-      const issue = await client.issue(issueId)
-      
-      if (!issue) {
-        throw new Error(`Issue ${issueId} not found`)
-      }
-      
-      // Build comment input
+      // Build comment input - createComment will validate issue existence
       const input: {body: string; issueId: string; parentId?: string} = {
         body: flags.body,
-        issueId: issue.id,
+        issueId,
       }
-      
+
       // Add parent ID if provided
       if (flags.parent) {
         input.parentId = flags.parent
       }
-      
-      // Create the comment
+
+      // Create the comment (API will validate issue existence)
       console.log(chalk.gray('Adding comment...'))
       const payload = await client.createComment(input)
-      
+
       if (!payload.success) {
         throw new Error('Failed to add comment')
       }
-      
-      // Display success message
-      console.log(chalk.green(`\n✓ Comment added successfully to ${chalk.bold(issue.identifier)}!`))
+
+      // Display success message (use issueId directly to avoid extra API call)
+      console.log(chalk.green(`\n✓ Comment added successfully to ${chalk.bold(issueId)}!`))
       console.log('')
-      
+
     } catch (error) {
       if (error instanceof Error) {
         throw error
