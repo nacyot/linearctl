@@ -1,5 +1,57 @@
 Use `lc` (after installing globally) or `npx linearctl` (without installation).
 
+## Setup and Configuration
+
+### Initial Setup
+
+Get your Linear API key from [Linear Settings](https://linear.app/settings/api), then initialize:
+
+```bash
+lc init
+# Enter your API key when prompted
+```
+
+### Multi-Profile Support
+
+Linear CLI supports multiple profiles for working with different Linear workspaces (e.g., personal and work accounts):
+
+```bash
+# Initialize profiles
+lc init --profile work
+lc init --profile personal
+
+# Use with any command
+lc issue list --profile work
+lc issue create --title "Task" --profile personal
+lc doctor --profile work
+```
+
+**Profile Priority Order:**
+1. `--profile` flag (highest priority) - explicitly select a profile
+2. `LINEAR_API_KEY` environment variable - override with direct API key
+3. `LINEAR_PROFILE` environment variable - select default profile
+4. Default profile (lowest priority) - first initialized profile
+
+Examples:
+```bash
+# Use explicit profile (overrides everything else)
+lc issue list --profile work
+
+# Set profile via environment variable
+export LINEAR_PROFILE=work
+lc issue list  # Uses work profile
+
+# Override with direct API key
+export LINEAR_API_KEY=lin_api_xxx
+lc issue list  # Uses API key from environment
+
+# But explicit profile flag wins
+export LINEAR_API_KEY=lin_api_xxx
+lc issue list --profile personal  # Uses personal profile API key
+```
+
+**Note:** All commands support the `--profile` flag. The first initialized profile automatically becomes the default profile.
+
 ## Issues
 
 ### lc issue list
@@ -18,6 +70,24 @@ lc issue list [options]
   --order-by <field>          Order by field (createdAt, updatedAt)
   --json                      Output as JSON
 ```
+
+Examples:
+```bash
+# Multiple states (OR logic)
+lc issue list --state "Todo,In Progress,Blocked"
+
+# Exclude completed states
+lc issue list --exclude-state "Done,Canceled"
+
+# Text search in title and description
+lc issue list --search "API bug" --team ENG
+
+# Combine filters
+lc issue list --team ENG --state Todo --label bug --search "login"
+```
+
+Note: All filter options support fuzzy matching. If an exact match is not found,
+the CLI will suggest similar items (e.g., "Shooping" → "Shopping").
 
 ### lc issue get
 ```bash
@@ -65,6 +135,21 @@ lc issue update <id> [options]
   --json                      Output as JSON
 ```
 
+Examples:
+```bash
+# Add labels without replacing existing ones
+lc issue update ENG-123 --add-labels "urgent,bug"
+
+# Remove specific labels
+lc issue update ENG-123 --remove-labels "wontfix"
+
+# Set priority and due date
+lc issue update ENG-123 --priority 1 --due-date "2025-12-31"
+
+# Clear due date and assignee
+lc issue update ENG-123 --due-date none --assignee none
+```
+
 ### lc issue mine
 ```bash
 lc issue mine [options]
@@ -81,6 +166,19 @@ lc issue delete <id> [options]
   --permanent                 Permanently delete the issue (cannot be undone)
   --json                      Output as JSON
 ```
+
+Examples:
+```bash
+# Archive issue (can be restored)
+lc issue delete ENG-123
+lc issue delete ENG-123 --archive
+
+# Permanently delete (cannot be undone)
+lc issue delete ENG-123 --permanent
+```
+
+Note: Archiving is the default and recommended option as it allows recovery.
+Use --permanent only when you're absolutely certain.
 
 ### lc issue batch
 ```bash
@@ -137,6 +235,27 @@ lc issue batch --query 'state:Todo team:ENG assignee:"John Doe"'
 lc issue batch --query "priority:1 label:bug"
 lc issue batch --query 'state:"In Progress" project:Q4'
 ```
+
+**Supported Query Keys:**
+- `state:<name>` - Filter by workflow state (e.g., "Todo", "In Progress")
+- `team:<key>` - Filter by team key (e.g., "ENG", "DESIGN")
+- `assignee:<name>` - Filter by assignee name or email
+- `label:<name>` - Filter by label name
+- `project:<name>` - Filter by project name
+- `cycle:<num>` - Filter by cycle number (e.g., "1", "2")
+- `priority:<0-4>` - Filter by priority (0=None, 1=Urgent, 2=High, 3=Normal, 4=Low)
+
+**Safety Features:**
+- **Interactive Confirmation**: When using `--query`, you'll see a preview of issues
+  and be asked to confirm before making changes (unless `--confirm` is used)
+- **Limit Protection**: Default limit of 50 issues prevents accidental mass updates.
+  Use `--limit 0` for unlimited, or set a custom limit (e.g., `--limit 100`)
+- **Dry Run**: Use `--dry-run` to preview exactly what will change without applying updates
+
+**Label Operations:**
+- `--add-labels`: Adds new labels while preserving existing ones
+- `--remove-labels`: Removes specific labels while keeping others
+- Both can be used together in the same command
 
 ## Comments
 
@@ -336,12 +455,38 @@ lc rule add <path>            Copy Linear CLI guide to project
 
 ### lc init
 ```bash
-lc init                       Configure API key
+lc init [options]
+  -k, --api-key <key>         Linear API key
+  --profile <name>            Profile name (default: "default")
+```
+
+Initialize Linear CLI with API key. Supports multiple profiles for different workspaces.
+
+Examples:
+```bash
+# Initialize default profile
+lc init
+
+# Initialize specific profile
+lc init --profile work
+lc init --profile personal --api-key lin_api_xxx
 ```
 
 ### lc doctor
 ```bash
-lc doctor                     Check configuration
+lc doctor [options]
+  --profile <name>            Check specific profile
+```
+
+Check configuration and test API connection.
+
+Examples:
+```bash
+# Check default profile
+lc doctor
+
+# Check specific profile
+lc doctor --profile work
 ```
 
 ### lc version

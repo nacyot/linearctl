@@ -21,6 +21,31 @@ lc init
 # Enter your API key when prompted
 ```
 
+### Multi-Profile Support
+
+Linear CLI supports multiple profiles for managing different Linear workspaces:
+
+```bash
+# Initialize a profile
+lc init --profile work
+lc init --profile personal
+
+# Use specific profile with any command
+lc issue list --profile work
+lc issue create --title "Task" --profile personal
+
+# Set default profile (first initialized profile becomes default)
+# You can also use LINEAR_PROFILE environment variable
+export LINEAR_PROFILE=work
+lc issue list  # Uses work profile
+```
+
+**Priority Order:**
+1. `--profile` flag (highest priority)
+2. `LINEAR_API_KEY` environment variable
+3. `LINEAR_PROFILE` environment variable
+4. Default profile (lowest priority)
+
 ## Usage
 
 ### Issues
