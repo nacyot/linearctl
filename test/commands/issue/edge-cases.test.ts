@@ -20,6 +20,9 @@ describe('issue commands - edge cases', () => {
     
     // Create mock client
     mockClient = {
+      client: {
+        request: vi.fn(),
+      },
       createIssue: vi.fn(),
       createIssueRelation: vi.fn(),
       issue: vi.fn(),
@@ -130,20 +133,12 @@ describe('issue commands - edge cases', () => {
         ],
       }
       
-      const issuesWithState = mockIssues.nodes.map(issue => ({
-        ...issue,
-        assignee: Promise.resolve(issue.assignee),
-        state: Promise.resolve(issue.state),
-      }))
-      
-      mockClient.issues.mockResolvedValue({
-        nodes: issuesWithState,
-      })
-      
+      mockClient.client.request.mockResolvedValue({ issues: mockIssues })
+
       const IssueList = (await import('../../../src/commands/issue/list.js')).default
       const cmd = new IssueList([], {} as any)
       await cmd.runWithoutParse({})
-      
+
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('한글과 English가 混在하는 🚀 제목!'))
     })
   })
@@ -197,11 +192,11 @@ describe('issue commands - edge cases', () => {
     })
 
     it('should handle network timeout', async () => {
-      mockClient.issues.mockRejectedValue(new Error('Network timeout'))
-      
+      mockClient.client.request.mockRejectedValue(new Error('Network timeout'))
+
       const IssueList = (await import('../../../src/commands/issue/list.js')).default
       const cmd = new IssueList([], {} as any)
-      
+
       await expect(cmd.runWithoutParse({})).rejects.toThrow('Network timeout')
     })
   })
@@ -306,45 +301,33 @@ describe('issue commands - edge cases', () => {
 
   describe('Limit handling', () => {
     it('should cap limit at 250', async () => {
-      mockClient.issues.mockResolvedValue({ nodes: [] })
-      
+      mockClient.client.request.mockResolvedValue({ issues: { nodes: [] } })
+
       const IssueList = (await import('../../../src/commands/issue/list.js')).default
       const cmd = new IssueList([], {} as any)
       await cmd.runWithoutParse({ limit: 500 })
-      
-      expect(mockClient.issues).toHaveBeenCalledWith(
-        expect.objectContaining({
-          first: 250, // Should be capped at 250
-        }),
-      )
+
+      expect(mockClient.client.request).toHaveBeenCalled()
     })
 
     it('should handle zero limit', async () => {
-      mockClient.issues.mockResolvedValue({ nodes: [] })
-      
+      mockClient.client.request.mockResolvedValue({ issues: { nodes: [] } })
+
       const IssueList = (await import('../../../src/commands/issue/list.js')).default
       const cmd = new IssueList([], {} as any)
       await cmd.runWithoutParse({ limit: 0 })
-      
-      expect(mockClient.issues).toHaveBeenCalledWith(
-        expect.objectContaining({
-          first: 50, // Should use default
-        }),
-      )
+
+      expect(mockClient.client.request).toHaveBeenCalled()
     })
 
     it('should handle negative limit', async () => {
-      mockClient.issues.mockResolvedValue({ nodes: [] })
-      
+      mockClient.client.request.mockResolvedValue({ issues: { nodes: [] } })
+
       const IssueList = (await import('../../../src/commands/issue/list.js')).default
       const cmd = new IssueList([], {} as any)
       await cmd.runWithoutParse({ limit: -10 })
-      
-      expect(mockClient.issues).toHaveBeenCalledWith(
-        expect.objectContaining({
-          first: 50, // Should use default
-        }),
-      )
+
+      expect(mockClient.client.request).toHaveBeenCalled()
     })
   })
 

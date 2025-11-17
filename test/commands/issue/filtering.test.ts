@@ -20,6 +20,9 @@ describe('issue list filtering', () => {
     
     // Create mock client
     mockClient = {
+      client: {
+        request: vi.fn(),
+      },
       cycles: vi.fn(),
       issue: vi.fn(),
       issueLabels: vi.fn(),
@@ -56,30 +59,36 @@ describe('issue list filtering', () => {
     })
     
     mockClient.team.mockReturnValue(mockTeam)
-    
-    const mockIssues = {
-      nodes: [
-        {
-          assignee: Promise.resolve(null),
-          identifier: 'ENG-123',
-          state: Promise.resolve({ name: 'In Progress', type: 'started' }),
-          title: 'Test issue',
-        },
-      ],
+
+    const mockResponse = {
+      issues: {
+        nodes: [
+          {
+            assignee: null,
+            createdAt: new Date('2024-01-01'),
+            id: 'issue-1',
+            identifier: 'ENG-123',
+            state: { color: '#ff0000', id: 'state-1', name: 'In Progress', type: 'started' },
+            title: 'Test issue',
+            updatedAt: new Date('2024-01-01'),
+          },
+        ],
+      },
     }
-    
-    mockClient.issues.mockResolvedValue(mockIssues)
-    
+
+    mockClient.client.request.mockResolvedValue(mockResponse)
+
     const IssueList = (await import('../../../src/commands/issue/list.js')).default
     const cmd = new IssueList([], {} as any)
     await cmd.runWithoutParse({ state: 'In Progress', team: 'ENG' })
-    
+
     // Verify state was resolved with team context
     expect(mockClient.team).toHaveBeenCalledWith('team-123')
     expect(mockTeam.states).toHaveBeenCalled()
-    
-    // Verify issues were filtered
-    expect(mockClient.issues).toHaveBeenCalledWith(
+
+    // Verify GraphQL query was called with correct filter
+    expect(mockClient.client.request).toHaveBeenCalledWith(
+      expect.any(Object), // GraphQL query (parsed by gql)
       expect.objectContaining({
         filter: expect.objectContaining({
           state: { id: { in: ['state-1'] } },
@@ -93,34 +102,40 @@ describe('issue list filtering', () => {
     mockClient.projects.mockResolvedValue({
       nodes: [{ id: 'project-123', name: 'Test Project' }],
     })
-    
+
     mockClient.teams.mockResolvedValue({ nodes: [] })
-    
-    const mockIssues = {
-      nodes: [
-        {
-          assignee: Promise.resolve(null),
-          identifier: 'PRJ-456',
-          state: Promise.resolve({ name: 'Todo', type: 'unstarted' }),
-          title: 'Project task',
-        },
-      ],
+
+    const mockResponse = {
+      issues: {
+        nodes: [
+          {
+            assignee: null,
+            createdAt: new Date('2024-01-01'),
+            id: 'issue-1',
+            identifier: 'PRJ-456',
+            state: { color: '#00ff00', id: 'state-1', name: 'Todo', type: 'unstarted' },
+            title: 'Project task',
+            updatedAt: new Date('2024-01-01'),
+          },
+        ],
+      },
     }
-    
-    mockClient.issues.mockResolvedValue(mockIssues)
-    
+
+    mockClient.client.request.mockResolvedValue(mockResponse)
+
     const IssueList = (await import('../../../src/commands/issue/list.js')).default
     const cmd = new IssueList([], {} as any)
     await cmd.runWithoutParse({ project: 'Test Project' })
-    
+
     // Verify project was resolved
     expect(mockClient.projects).toHaveBeenCalledWith({
       filter: { name: { containsIgnoreCase: 'Test Project' } },
       first: 1,
     })
-    
-    // Verify issues were filtered by project
-    expect(mockClient.issues).toHaveBeenCalledWith(
+
+    // Verify GraphQL query was called with correct filter
+    expect(mockClient.client.request).toHaveBeenCalledWith(
+      expect.any(Object),
       expect.objectContaining({
         filter: expect.objectContaining({
           project: { id: { eq: 'project-123' } },
@@ -145,30 +160,36 @@ describe('issue list filtering', () => {
     })
     
     mockClient.team.mockReturnValue(mockTeam)
-    
-    const mockIssues = {
-      nodes: [
-        {
-          assignee: Promise.resolve(null),
-          identifier: 'ENG-789',
-          state: Promise.resolve({ name: 'In Progress', type: 'started' }),
-          title: 'Cycle task',
-        },
-      ],
+
+    const mockResponse = {
+      issues: {
+        nodes: [
+          {
+            assignee: null,
+            createdAt: new Date('2024-01-01'),
+            id: 'issue-1',
+            identifier: 'ENG-789',
+            state: { color: '#ff0000', id: 'state-1', name: 'In Progress', type: 'started' },
+            title: 'Cycle task',
+            updatedAt: new Date('2024-01-01'),
+          },
+        ],
+      },
     }
-    
-    mockClient.issues.mockResolvedValue(mockIssues)
-    
+
+    mockClient.client.request.mockResolvedValue(mockResponse)
+
     const IssueList = (await import('../../../src/commands/issue/list.js')).default
     const cmd = new IssueList([], {} as any)
     await cmd.runWithoutParse({ cycle: '2', team: 'ENG' })
-    
+
     // Verify cycle was resolved with team context
     expect(mockClient.team).toHaveBeenCalledWith('team-123')
     expect(mockTeam.cycles).toHaveBeenCalled()
-    
-    // Verify issues were filtered
-    expect(mockClient.issues).toHaveBeenCalledWith(
+
+    // Verify GraphQL query was called with correct filter
+    expect(mockClient.client.request).toHaveBeenCalledWith(
+      expect.any(Object),
       expect.objectContaining({
         filter: expect.objectContaining({
           cycle: { id: { eq: 'cycle-2' } },
@@ -202,13 +223,15 @@ describe('issue list filtering', () => {
     mockClient.issueLabels.mockResolvedValue({
       nodes: [{ id: 'label-123', name: 'bug' }],
     })
-    
-    const mockIssues = {
-      nodes: [],
+
+    const mockResponse = {
+      issues: {
+        nodes: [],
+      },
     }
-    
-    mockClient.issues.mockResolvedValue(mockIssues)
-    
+
+    mockClient.client.request.mockResolvedValue(mockResponse)
+
     const IssueList = (await import('../../../src/commands/issue/list.js')).default
     const cmd = new IssueList([], {} as any)
     await cmd.runWithoutParse({
@@ -217,9 +240,10 @@ describe('issue list filtering', () => {
       state: 'In Progress',
       team: 'ENG',
     })
-    
-    // Verify all filters were applied
-    expect(mockClient.issues).toHaveBeenCalledWith(
+
+    // Verify GraphQL query was called with all filters
+    expect(mockClient.client.request).toHaveBeenCalledWith(
+      expect.any(Object),
       expect.objectContaining({
         filter: expect.objectContaining({
           assignee: { id: { eq: 'user-123' } },
@@ -234,7 +258,7 @@ describe('issue list filtering', () => {
   it('should handle filtering by label with special characters', async () => {
     // Test with label ID (contains hyphen)
     mockClient.issueLabels.mockResolvedValue({ nodes: [] })
-    mockClient.issues.mockResolvedValue({ nodes: [] })
+    mockClient.client.request.mockResolvedValue({ issues: { nodes: [] } })
 
     const IssueList = (await import('../../../src/commands/issue/list.js')).default
     const cmd = new IssueList([], {} as any)
@@ -243,8 +267,9 @@ describe('issue list filtering', () => {
     // Should not call issueLabels for IDs
     expect(mockClient.issueLabels).not.toHaveBeenCalled()
 
-    // Should use the ID directly
-    expect(mockClient.issues).toHaveBeenCalledWith(
+    // Verify GraphQL query was called with label ID
+    expect(mockClient.client.request).toHaveBeenCalledWith(
+      expect.any(Object),
       expect.objectContaining({
         filter: expect.objectContaining({
           labels: { id: { in: ['2be7acd3-9f68-4107-ac8c-1b182d60c517'] } },
@@ -272,24 +297,32 @@ describe('issue list filtering', () => {
 
     mockClient.team.mockReturnValue(mockTeam)
 
-    const mockIssues = {
-      nodes: [
-        {
-          assignee: Promise.resolve(null),
-          identifier: 'NAC-1',
-          state: Promise.resolve({ name: 'Backlog', type: 'backlog' }),
-          title: 'Issue 1',
-        },
-        {
-          assignee: Promise.resolve(null),
-          identifier: 'NAC-2',
-          state: Promise.resolve({ name: 'Todo', type: 'unstarted' }),
-          title: 'Issue 2',
-        },
-      ],
+    const mockResponse = {
+      issues: {
+        nodes: [
+          {
+            assignee: null,
+            createdAt: new Date('2024-01-01'),
+            id: 'issue-1',
+            identifier: 'NAC-1',
+            state: { color: '#ff0000', id: 'state-1', name: 'Backlog', type: 'backlog' },
+            title: 'Issue 1',
+            updatedAt: new Date('2024-01-01'),
+          },
+          {
+            assignee: null,
+            createdAt: new Date('2024-01-02'),
+            id: 'issue-2',
+            identifier: 'NAC-2',
+            state: { color: '#00ff00', id: 'state-2', name: 'Todo', type: 'unstarted' },
+            title: 'Issue 2',
+            updatedAt: new Date('2024-01-02'),
+          },
+        ],
+      },
     }
 
-    mockClient.issues.mockResolvedValue(mockIssues)
+    mockClient.client.request.mockResolvedValue(mockResponse)
 
     const IssueList = (await import('../../../src/commands/issue/list.js')).default
     const cmd = new IssueList([], {} as any)
@@ -299,8 +332,9 @@ describe('issue list filtering', () => {
     expect(mockClient.team).toHaveBeenCalledWith('team-123')
     expect(mockTeam.states).toHaveBeenCalled()
 
-    // Verify issues were filtered with 'in' operator
-    expect(mockClient.issues).toHaveBeenCalledWith(
+    // Verify GraphQL query was called with multiple states
+    expect(mockClient.client.request).toHaveBeenCalledWith(
+      expect.any(Object),
       expect.objectContaining({
         filter: expect.objectContaining({
           state: { id: { in: ['state-1', 'state-2', 'state-3'] } },
@@ -327,25 +361,31 @@ describe('issue list filtering', () => {
 
     mockClient.team.mockReturnValue(mockTeam)
 
-    const mockIssues = {
-      nodes: [
-        {
-          assignee: Promise.resolve(null),
-          identifier: 'NAC-1',
-          state: Promise.resolve({ name: 'Backlog', type: 'backlog' }),
-          title: 'Active issue',
-        },
-      ],
+    const mockResponse = {
+      issues: {
+        nodes: [
+          {
+            assignee: null,
+            createdAt: new Date('2024-01-01'),
+            id: 'issue-1',
+            identifier: 'NAC-1',
+            state: { color: '#ff0000', id: 'state-3', name: 'Backlog', type: 'backlog' },
+            title: 'Active issue',
+            updatedAt: new Date('2024-01-01'),
+          },
+        ],
+      },
     }
 
-    mockClient.issues.mockResolvedValue(mockIssues)
+    mockClient.client.request.mockResolvedValue(mockResponse)
 
     const IssueList = (await import('../../../src/commands/issue/list.js')).default
     const cmd = new IssueList([], {} as any)
     await cmd.runWithoutParse({ 'exclude-state': 'Done,Canceled', team: 'NAC' })
 
-    // Verify issues were filtered with 'nin' operator
-    expect(mockClient.issues).toHaveBeenCalledWith(
+    // Verify GraphQL query was called with exclude filter
+    expect(mockClient.client.request).toHaveBeenCalledWith(
+      expect.any(Object),
       expect.objectContaining({
         filter: expect.objectContaining({
           state: { id: { nin: ['state-1', 'state-2'] } },
@@ -356,14 +396,15 @@ describe('issue list filtering', () => {
   })
 
   it('should handle text search in title and description', async () => {
-    mockClient.issues.mockResolvedValue({ nodes: [] })
+    mockClient.client.request.mockResolvedValue({ issues: { nodes: [] } })
 
     const IssueList = (await import('../../../src/commands/issue/list.js')).default
     const cmd = new IssueList([], {} as any)
     await cmd.runWithoutParse({ search: '블랙박스' })
 
-    // Verify search filter with 'or' operator
-    expect(mockClient.issues).toHaveBeenCalledWith(
+    // Verify GraphQL query was called with search filter
+    expect(mockClient.client.request).toHaveBeenCalledWith(
+      expect.any(Object),
       expect.objectContaining({
         filter: expect.objectContaining({
           or: [

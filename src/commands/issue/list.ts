@@ -1,6 +1,7 @@
-import { Issue, LinearClient, LinearDocument } from '@linear/sdk'
+import { LinearClient, LinearDocument } from '@linear/sdk'
 import { Flags } from '@oclif/core'
 import chalk from 'chalk'
+import { gql } from 'graphql-tag'
 
 import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
@@ -288,17 +289,59 @@ static flags = {
         variables.filter = filter
       }
       
-      // Fetch issues
-      const issues = await client.issues(variables)
-      
-      // Fetch state for each issue
-      const issuesWithState = await Promise.all(
-        issues.nodes.map(async (issue: Issue) => ({
-          ...issue,
-          assignee: await issue.assignee,
-          state: await issue.state
-        }))
-      )
+      // Fetch issues with GraphQL fragment to avoid N+1 queries
+      const ISSUE_LIST_QUERY = gql`
+        query IssuesList(
+          $first: Int!
+          $filter: IssueFilter
+          $orderBy: PaginationOrderBy
+          $includeArchived: Boolean
+        ) {
+          issues(
+            first: $first
+            filter: $filter
+            orderBy: $orderBy
+            includeArchived: $includeArchived
+          ) {
+            nodes {
+              id
+              identifier
+              title
+              createdAt
+              updatedAt
+              assignee {
+                id
+                name
+                email
+              }
+              state {
+                id
+                name
+                type
+                color
+              }
+            }
+          }
+        }
+      `
+
+      const data = await client.client.request<
+        {
+          issues: {
+            nodes: Array<{
+              assignee: null | { email: string; id: string; name: string }
+              createdAt: Date
+              id: string
+              identifier: string
+              state: { color: string; id: string; name: string; type: string }
+              title: string
+              updatedAt: Date
+            }>
+          }
+        },
+        typeof variables
+      >(ISSUE_LIST_QUERY, variables)
+      const issuesWithState = data.issues.nodes
       
       // Output results
       if (flags.json) {
