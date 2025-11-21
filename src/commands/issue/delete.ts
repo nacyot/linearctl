@@ -3,6 +3,7 @@ import chalk from 'chalk'
 
 import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
+import { handleLinearError } from '../../utils/error-handler.js'
 
 export default class IssueDelete extends BaseCommand {
   static args = {
@@ -94,11 +95,7 @@ export default class IssueDelete extends BaseCommand {
         console.log(chalk.gray(`Title: ${issueTitle}`))
       }
     } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-
-      throw new Error(`Failed to delete issue ${issueId}`)
+      handleLinearError(error)
     }
   }
 }

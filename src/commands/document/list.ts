@@ -5,6 +5,7 @@ import chalk from 'chalk'
 import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { ListFlags } from '../../types/commands.js'
+import { handleLinearError } from '../../utils/error-handler.js'
 import { formatDate, formatTable, truncateText } from '../../utils/table-formatter.js'
 
 // Type definitions for document data structures
@@ -204,11 +205,7 @@ export default class DocumentList extends BaseCommand {
         console.log(formatTable({ headers, rows }))
       }
     } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-
-      throw new Error('Failed to fetch documents')
+      handleLinearError(error)
     }
   }
 }

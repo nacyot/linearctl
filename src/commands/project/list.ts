@@ -6,6 +6,7 @@ import chalk from 'chalk'
 import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { ListFlags } from '../../types/commands.js'
+import { handleLinearError } from '../../utils/error-handler.js'
 import { formatDate, formatPercent, formatTable } from '../../utils/table-formatter.js'
 
 export default class ProjectList extends BaseCommand {
@@ -170,11 +171,7 @@ static flags = {
       }
       
     } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-
-      throw new Error('Failed to fetch projects')
+      handleLinearError(error)
     }
   }
 

@@ -5,6 +5,7 @@ import chalk from 'chalk'
 import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { CreateIssueFlags } from '../../types/commands.js'
+import { handleLinearError } from '../../utils/error-handler.js'
 
 export default class IssueCreate extends BaseCommand {
   static description = 'Create a new Linear issue'
@@ -295,11 +296,7 @@ static flags = {
       }
 
     } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-
-      throw new Error('Failed to create issue')
+      handleLinearError(error)
     }
   }
 

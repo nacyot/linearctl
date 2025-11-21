@@ -6,6 +6,7 @@ import { gql } from 'graphql-tag'
 import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { ListFlags } from '../../types/commands.js'
+import { handleLinearError } from '../../utils/error-handler.js'
 import { findSimilar, getSuggestionMessage } from '../../utils/fuzzy.js'
 import { formatState, formatTable, truncateText } from '../../utils/table-formatter.js'
 
@@ -359,11 +360,7 @@ static flags = {
       }
       
     } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-
-      throw new Error('Failed to fetch issues')
+      handleLinearError(error)
     }
   }
 

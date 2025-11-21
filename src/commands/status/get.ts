@@ -4,6 +4,7 @@ import chalk from 'chalk'
 import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { CommonFlags } from '../../types/commands.js'
+import { handleLinearError } from '../../utils/error-handler.js'
 
 // Interface for team data
 interface TeamData {
@@ -152,11 +153,7 @@ static description = 'Get workflow state details by ID or name'
         console.log('')
       }
     } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-
-      throw new Error('Failed to get workflow state')
+      handleLinearError(error)
     }
   }
 

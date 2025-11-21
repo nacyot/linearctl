@@ -5,6 +5,7 @@ import chalk from 'chalk'
 import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { CommonFlags } from '../../types/commands.js'
+import { handleLinearError } from '../../utils/error-handler.js'
 export default class ProjectGet extends BaseCommand {
   static args = {
     identifier: Args.string({
@@ -71,11 +72,7 @@ export default class ProjectGet extends BaseCommand {
       }
       
     } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-
-      throw new Error(`Failed to fetch project "${identifier}"`)
+      handleLinearError(error)
     }
   }
 

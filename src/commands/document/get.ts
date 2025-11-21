@@ -4,6 +4,7 @@ import chalk from 'chalk'
 import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { CommonFlags } from '../../types/commands.js'
+import { handleLinearError } from '../../utils/error-handler.js'
 import { formatDate } from '../../utils/table-formatter.js'
 
 export default class DocumentGet extends BaseCommand {
@@ -96,11 +97,7 @@ static description = 'Get a specific document by ID or slug'
         console.log('')
       }
     } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-
-      throw new Error('Failed to fetch document')
+      handleLinearError(error)
     }
   }
 

@@ -4,6 +4,7 @@ import chalk from 'chalk'
 import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { AttachmentAddFlags } from '../../types/commands.js'
+import { handleLinearError } from '../../utils/error-handler.js'
 
 export default class AttachmentAdd extends BaseCommand {
   static description = 'Add a URL-based attachment to a Linear issue'
@@ -139,11 +140,7 @@ export default class AttachmentAdd extends BaseCommand {
         await open.default(flags.url)
       }
     } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-
-      throw new Error('Failed to create attachment')
+      handleLinearError(error)
     }
   }
 

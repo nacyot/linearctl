@@ -9,6 +9,7 @@ import type { AttachmentUploadFlags } from '../../types/commands.js'
 import { BaseCommand } from '../../base-command.js'
 import { uploadFile } from '../../lib/upload-file.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
+import { handleLinearError } from '../../utils/error-handler.js'
 
 export default class AttachmentUpload extends BaseCommand {
   static description = 'Upload a file as an attachment to a Linear issue'
@@ -159,11 +160,7 @@ export default class AttachmentUpload extends BaseCommand {
         await open.default(uploadResult.uploadFile.assetUrl)
       }
     } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-
-      throw new Error('Failed to upload file')
+      handleLinearError(error)
     }
   }
 }

@@ -5,6 +5,7 @@ import chalk from 'chalk'
 import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { UpdateProjectFlags } from '../../types/commands.js'
+import { handleLinearError } from '../../utils/error-handler.js'
 export default class ProjectUpdate extends BaseCommand {
   static args = {
     identifier: Args.string({
@@ -218,11 +219,7 @@ export default class ProjectUpdate extends BaseCommand {
       }
       
     } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-
-      throw new Error(`Failed to update project "${identifier}"`)
+      handleLinearError(error)
     }
   }
 

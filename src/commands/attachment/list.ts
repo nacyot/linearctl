@@ -4,6 +4,7 @@ import chalk from 'chalk'
 import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { AttachmentListFlags } from '../../types/commands.js'
+import { handleLinearError } from '../../utils/error-handler.js'
 
 export default class AttachmentList extends BaseCommand {
   static args = {
@@ -71,11 +72,7 @@ static flags = {
         this.displayAttachments(issue, attachmentsWithCreators)
       }
     } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-
-      throw new Error(`Failed to fetch attachments for issue ${issueId}`)
+      handleLinearError(error)
     }
   }
 

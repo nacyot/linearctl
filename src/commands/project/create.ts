@@ -4,6 +4,7 @@ import chalk from 'chalk'
 import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { CreateProjectFlags } from '../../types/commands.js'
+import { handleLinearError } from '../../utils/error-handler.js'
 export default class ProjectCreate extends BaseCommand {
   static description = 'Create a new project'
   static examples = [
@@ -204,11 +205,7 @@ export default class ProjectCreate extends BaseCommand {
       }
       
     } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-
-      throw new Error('Failed to create project')
+      handleLinearError(error)
     }
   }
 

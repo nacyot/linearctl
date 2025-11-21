@@ -5,6 +5,7 @@ import chalk from 'chalk'
 import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { ListFlags } from '../../types/commands.js'
+import { handleLinearError } from '../../utils/error-handler.js'
 import { formatState, formatTable } from '../../utils/table-formatter.js'
 
 interface TeamData {
@@ -103,11 +104,7 @@ static flags = {
       }
       
     } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-
-      throw new Error(`Failed to fetch states for team "${flags.team}"`)
+      handleLinearError(error)
     }
   }
 
