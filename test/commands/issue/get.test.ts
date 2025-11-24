@@ -228,4 +228,88 @@ describe('issue get command', () => {
     expect(jsonCall![0]).toContain('ENG-123')
     expect(jsonCall![0]).toContain('ENG-124')
   })
+
+  it('should output markdown format when --format markdown is used', async () => {
+    const mockIssue = {
+      assignee: Promise.resolve({ name: 'John Doe' }),
+      attachments: vi.fn().mockResolvedValue({ nodes: [] }),
+      children: vi.fn().mockResolvedValue({ nodes: [] }),
+      comments: vi.fn().mockResolvedValue({
+        nodes: [
+          {
+            body: 'This is a comment',
+            createdAt: new Date('2024-01-03'),
+            id: 'comment-1',
+            user: Promise.resolve({ name: 'Jane Smith' }),
+          }
+        ]
+      }),
+      createdAt: new Date('2024-01-01'),
+      cycle: Promise.resolve({ id: 'cycle-1', name: 'Cycle 3', number: 3 }),
+      description: 'The login form is not working properly',
+      id: 'issue-1',
+      identifier: 'ENG-123',
+      labels: vi.fn().mockResolvedValue({ nodes: [{ name: 'bug' }, { name: 'high-priority' }] }),
+      parent: Promise.resolve(null),
+      priority: 1,
+      project: Promise.resolve({ name: 'Q1 Goals' }),
+      state: Promise.resolve({ name: 'In Progress', type: 'started' }),
+      team: Promise.resolve({ key: 'ENG', name: 'Engineering' }),
+      title: 'Fix bug in login',
+      updatedAt: new Date('2024-01-02'),
+      url: 'https://linear.app/company/issue/ENG-123',
+    }
+
+    mockClient.issue.mockResolvedValue(mockIssue)
+
+    const IssueGet = (await import('../../../src/commands/issue/get.js')).default
+    const cmd = new IssueGet(['ENG-123'], {} as any)
+    await cmd.runWithArgs('ENG-123', { format: 'markdown' })
+
+    // Verify markdown output
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('# ENG-123'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Fix bug in login'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('## Metadata'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('**State:** In Progress'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('**Assignee:** John Doe'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('## Description'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('The login form is not working properly'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('## Comments (1)'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Jane Smith'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('This is a comment'))
+  })
+
+  it('should output markdown format when --format md is used', async () => {
+    const mockIssue = {
+      assignee: Promise.resolve({ name: 'John Doe' }),
+      attachments: vi.fn().mockResolvedValue({ nodes: [] }),
+      children: vi.fn().mockResolvedValue({ nodes: [] }),
+      comments: vi.fn().mockResolvedValue({ nodes: [] }),
+      createdAt: new Date('2024-01-01'),
+      cycle: Promise.resolve(null),
+      description: 'Test description',
+      id: 'issue-1',
+      identifier: 'ENG-123',
+      labels: vi.fn().mockResolvedValue({ nodes: [] }),
+      parent: Promise.resolve(null),
+      priority: 2,
+      project: Promise.resolve(null),
+      state: Promise.resolve({ name: 'Todo', type: 'unstarted' }),
+      team: Promise.resolve({ key: 'ENG', name: 'Engineering' }),
+      title: 'Test issue',
+      updatedAt: new Date('2024-01-02'),
+      url: 'https://linear.app/company/issue/ENG-123',
+    }
+
+    mockClient.issue.mockResolvedValue(mockIssue)
+
+    const IssueGet = (await import('../../../src/commands/issue/get.js')).default
+    const cmd = new IssueGet(['ENG-123'], {} as any)
+    await cmd.runWithArgs('ENG-123', { format: 'md' })
+
+    // Verify markdown output
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('# ENG-123'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Test issue'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('## Metadata'))
+  })
 })

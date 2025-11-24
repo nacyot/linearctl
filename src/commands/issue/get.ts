@@ -5,6 +5,7 @@ import { BaseCommand } from '../../base-command.js'
 import { getLinearClient, hasApiKey } from '../../services/linear.js'
 import { CommonFlags } from '../../types/commands.js'
 import { handleLinearError } from '../../utils/error-handler.js'
+import { formatIssueAsMarkdown } from '../../utils/markdown-formatter.js'
 
 export default class IssueGet extends BaseCommand {
   static args = {
@@ -21,6 +22,10 @@ static examples = [
   ]
 static flags = {
     ...BaseCommand.baseFlags,
+    format: Flags.string({
+      description: 'Output format (markdown or md)',
+      options: ['markdown', 'md'],
+    }),
     json: Flags.boolean({
       default: false,
       description: 'Output as JSON',
@@ -38,7 +43,7 @@ static flags = {
       : this.runWithMultipleArgs(issueIds, flags))
   }
 
-  async runWithArgs(issueId: string, flags: CommonFlags & { profile?: string } = {}): Promise<void> {
+  async runWithArgs(issueId: string, flags: CommonFlags & { format?: string; profile?: string } = {}): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
@@ -92,6 +97,30 @@ static flags = {
           url: issue.url,
         }
         console.log(JSON.stringify(output, null, 2))
+      } else if (flags.format === 'markdown' || flags.format === 'md') {
+        // Markdown format
+        const issueData = {
+          assignee: assignee ? { name: assignee.name } : undefined,
+          attachments,
+          children,
+          comments,
+          createdAt: issue.createdAt,
+          cycle,
+          description: issue.description,
+          dueDate: issue.dueDate,
+          identifier: issue.identifier,
+          labels,
+          parent,
+          priority: issue.priority,
+          project,
+          state,
+          team,
+          title: issue.title,
+          updatedAt: issue.updatedAt,
+          url: issue.url,
+        }
+        const markdown = await formatIssueAsMarkdown(issueData)
+        console.log(markdown)
       } else {
         this.displayIssue(issue, { assignee, attachments, children, comments, cycle, dueDate: issue.dueDate, labels, parent, priority: issue.priority, project, state, team })
       }
@@ -101,7 +130,7 @@ static flags = {
     }
   }
 
-  async runWithMultipleArgs(issueIds: string[], flags: CommonFlags & { profile?: string } = {}): Promise<void> {
+  async runWithMultipleArgs(issueIds: string[], flags: CommonFlags & { format?: string; profile?: string } = {}): Promise<void> {
     // Check API key
     if (!hasApiKey()) {
       throw new Error('No API key configured. Run "lc init" first.')
@@ -199,6 +228,34 @@ static flags = {
           url: issue.url,
         }))
         console.log(JSON.stringify(output, null, 2))
+      } else if (flags.format === 'markdown' || flags.format === 'md') {
+        // Markdown format for multiple issues
+        const markdownPromises = issues.map(issue => {
+          const issueData = {
+            assignee: issue.assignee ? { name: issue.assignee.name } : undefined,
+            attachments: issue.attachments,
+            children: issue.children,
+            comments: issue.comments,
+            createdAt: issue.createdAt,
+            cycle: issue.cycle || undefined,
+            description: issue.description,
+            dueDate: issue.dueDate,
+            identifier: issue.identifier,
+            labels: issue.labels,
+            parent: issue.parent || undefined,
+            priority: issue.priority,
+            project: issue.project || undefined,
+            state: issue.state || undefined,
+            team: issue.team || undefined,
+            title: issue.title,
+            updatedAt: issue.updatedAt,
+            url: issue.url,
+          }
+          return formatIssueAsMarkdown(issueData)
+        })
+
+        const markdowns = await Promise.all(markdownPromises)
+        console.log(markdowns.join('\n---\n'))
       } else {
         // Display each issue
         for (const [index, issue] of issues.entries()) {
