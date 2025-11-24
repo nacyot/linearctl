@@ -122,6 +122,11 @@ lc issue list [options]
 
 Examples:
 ```bash
+# Filter by cycle (works with or without team)
+lc issue list --cycle 2
+lc issue list --cycle "Sprint 1"
+lc issue list --team ENG --cycle 2
+
 # Multiple states (OR logic)
 lc issue list --state "Todo,In Progress,Blocked"
 
