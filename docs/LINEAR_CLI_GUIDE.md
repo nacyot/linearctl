@@ -120,6 +120,11 @@ lc issue list [options]
   --json                      Output as JSON
 ```
 
+**Output includes:**
+- ID, Title, State, Assignee
+- **Updated**: Relative time since last update (e.g., "2h ago", "3d ago")
+- **Comments**: Number of comments on each issue
+
 Examples:
 ```bash
 # Filter by cycle (works with or without team)
@@ -145,27 +150,42 @@ the CLI will suggest similar items (e.g., "Shooping" → "Shopping").
 
 ### lc issue get
 ```bash
-lc issue get <id> [--json]
-lc issue get <id1> <id2> <id3> [--json]
-lc issue get <id1>,<id2>,<id3> [--json]
+lc issue get <id> [options]
+lc issue get <id1> <id2> <id3> [options]
+lc issue get <id1>,<id2>,<id3> [options]
+  --format <type>             Output format (markdown, md)
+  --json                      Output as JSON
 ```
 
 Fetch details of one or more issues. Supports both space-separated and comma-separated issue IDs for batch operations.
 
+**💡 Recommended:** Use `--format markdown` to get complete issue details including all comments,
+similar to viewing the issue in Linear's web interface.
+
 Examples:
 ```bash
-# Single issue
+# Markdown format (recommended) - shows complete details with all comments
+lc issue get ENG-123 --format markdown
+lc issue get ENG-123 --format md
+
+# Default format - compact view
 lc issue get ENG-123
 
-# Multiple issues (space-separated)
-lc issue get ENG-123 ENG-124 ENG-125
+# Multiple issues in markdown format
+lc issue get ENG-123 ENG-124 ENG-125 --format md
 
 # Multiple issues (comma-separated)
 lc issue get ENG-123,ENG-124,ENG-125
 
-# JSON output for multiple issues
+# JSON output for automation
 lc issue get ENG-123,ENG-124 --json
 ```
+
+**Output Formats:**
+- **Default**: Compact terminal-friendly view with summary information
+- **Markdown** (`--format markdown` or `--format md`): Complete details including all comments,
+  attachments, sub-issues, and full metadata - similar to the web interface
+- **JSON** (`--json`): Machine-readable format for scripting and automation
 
 ### lc issue create
 ```bash
