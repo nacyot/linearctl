@@ -415,4 +415,83 @@ describe('issue list filtering', () => {
       })
     )
   })
+
+  it('should filter issues by cycle number without team context', async () => {
+    mockClient.cycles.mockResolvedValue({
+      nodes: [
+        { id: 'cycle-1', name: null, number: 1 },
+        { id: 'cycle-2', name: null, number: 2 },
+        { id: 'cycle-3', name: 'Sprint 3', number: 3 },
+      ],
+    })
+
+    const mockResponse = {
+      issues: {
+        nodes: [
+          {
+            assignee: null,
+            createdAt: new Date('2024-01-01'),
+            id: 'issue-1',
+            identifier: 'ENG-100',
+            state: { color: '#ff0000', id: 'state-1', name: 'In Progress', type: 'started' },
+            title: 'Cycle 2 task',
+            updatedAt: new Date('2024-01-01'),
+          },
+        ],
+      },
+    }
+
+    mockClient.client.request.mockResolvedValue(mockResponse)
+
+    const IssueList = (await import('../../../src/commands/issue/list.js')).default
+    const cmd = new IssueList([], {} as any)
+    await cmd.runWithoutParse({ cycle: '2' })
+
+    // Verify cycles were fetched
+    expect(mockClient.cycles).toHaveBeenCalled()
+
+    // Verify GraphQL query was called with correct cycle filter
+    expect(mockClient.client.request).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        filter: expect.objectContaining({
+          cycle: { id: { eq: 'cycle-2' } },
+        }),
+      })
+    )
+  })
+
+  it('should filter issues by cycle name without team context', async () => {
+    mockClient.cycles.mockResolvedValue({
+      nodes: [
+        { id: 'cycle-1', name: 'Sprint 1', number: 1 },
+        { id: 'cycle-2', name: 'Sprint 2', number: 2 },
+      ],
+    })
+
+    const mockResponse = {
+      issues: {
+        nodes: [],
+      },
+    }
+
+    mockClient.client.request.mockResolvedValue(mockResponse)
+
+    const IssueList = (await import('../../../src/commands/issue/list.js')).default
+    const cmd = new IssueList([], {} as any)
+    await cmd.runWithoutParse({ cycle: 'Sprint 2' })
+
+    // Verify cycles were fetched
+    expect(mockClient.cycles).toHaveBeenCalled()
+
+    // Verify GraphQL query was called with correct cycle filter
+    expect(mockClient.client.request).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        filter: expect.objectContaining({
+          cycle: { id: { eq: 'cycle-2' } },
+        }),
+      })
+    )
+  })
 })

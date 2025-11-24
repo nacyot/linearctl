@@ -408,12 +408,12 @@ static flags = {
     if (nameOrNumber.includes('-')) {
       return nameOrNumber
     }
-    
+
     // If we have a teamId, get cycles for that specific team
     if (teamId) {
       const team = await client.team(teamId)
       const cycles = await team.cycles()
-      
+
       // Try to match by name or number
       const matchingCycle = cycles.nodes.find(
         (cycle) => {
@@ -424,14 +424,23 @@ static flags = {
       )
       return matchingCycle?.id || null
     }
-    
-    // Otherwise search all cycles
+
+    // Without team context, fetch all cycles and match locally
+    // Linear API doesn't support filtering by number, so we fetch and filter client-side
     const cycles = await client.cycles({
-      filter: { name: { containsIgnoreCase: nameOrNumber } },
-      first: 1,
+      first: 250, // Fetch more cycles to ensure we find the match
     })
-    
-    return cycles.nodes[0]?.id || null
+
+    // Try to match by name or number
+    const matchingCycle = cycles.nodes.find(
+      (cycle) => {
+        const nameMatch = cycle.name?.toLowerCase() === nameOrNumber.toLowerCase()
+        const numberMatch = cycle.number?.toString() === nameOrNumber
+        return nameMatch || numberMatch
+      }
+    )
+
+    return matchingCycle?.id || null
   }
 
   private async resolveLabelId(client: LinearClient, nameOrId: string): Promise<null | string> {
