@@ -325,6 +325,21 @@ static flags = {
                 type
                 color
               }
+              cycle {
+                id
+                name
+                number
+              }
+              labels {
+                nodes {
+                  id
+                  name
+                }
+              }
+              project {
+                id
+                name
+              }
             }
           }
         }
@@ -336,12 +351,15 @@ static flags = {
             nodes: Array<{
               assignee: null | { email: string; id: string; name: string }
               createdAt: Date
+              cycle: null | { id: string; name: null | string; number: number }
               description?: string
               dueDate?: string
               estimate?: number
               id: string
               identifier: string
+              labels: { nodes: Array<{ id: string; name: string }> }
               priority: number
+              project: null | { id: string; name: string }
               state: { color: string; id: string; name: string; type: string }
               title: string
               updatedAt: Date
