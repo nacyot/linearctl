@@ -13,9 +13,11 @@ import { formatState, formatTable, truncateText } from '../../utils/table-format
 // Type for issues with resolved assignee and state
 interface EnrichedIssue {
   assignee?: null | { name?: string }
+  comments?: { nodes: Array<{ id: string }> }
   identifier: string
-  state?: { name?: string, type?: string }
+  state?: { name?: string; type?: string }
   title: string
+  updatedAt?: Date
 }
 
 export default class IssueList extends BaseCommand {
@@ -340,6 +342,11 @@ static flags = {
                 id
                 name
               }
+              comments {
+                nodes {
+                  id
+                }
+              }
             }
           }
         }
@@ -350,6 +357,7 @@ static flags = {
           issues: {
             nodes: Array<{
               assignee: null | { email: string; id: string; name: string }
+              comments: { nodes: Array<{ id: string }> }
               createdAt: Date
               cycle: null | { id: string; name: null | string; number: number }
               description?: string
@@ -387,20 +395,41 @@ static flags = {
       console.log(chalk.yellow('No issues found'))
       return
     }
-    
+
     console.log(chalk.bold(`\nFound ${issues.length} issue${issues.length === 1 ? '' : 's'}:`))
-    
+
     // Prepare table data
-    const headers = ['ID', 'Title', 'State', 'Assignee']
+    const headers = ['ID', 'Title', 'State', 'Assignee', 'Updated', 'Comments']
     const rows = issues.map(issue => [
       chalk.cyan(issue.identifier),
-      truncateText(issue.title, 50),
+      truncateText(issue.title, 40),
       formatState(issue.state),
-      issue.assignee?.name || chalk.gray('Unassigned')
+      truncateText(issue.assignee?.name || chalk.gray('Unassigned'), 15),
+      this.formatRelativeDate(issue.updatedAt),
+      issue.comments ? String(issue.comments.nodes.length) : '0'
     ])
-    
+
     // Display table
     console.log(formatTable({ headers, rows }))
+  }
+
+  private formatRelativeDate(date?: Date): string {
+    if (!date) return chalk.gray('N/A')
+
+    const now = new Date()
+    const diffMs = now.getTime() - new Date(date).getTime()
+    const diffMins = Math.floor(diffMs / 60_000)
+    const diffHours = Math.floor(diffMs / 3_600_000)
+    const diffDays = Math.floor(diffMs / 86_400_000)
+
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`
+
+    return `${Math.floor(diffDays / 365)}y ago`
   }
 
   private async resolveCycleId(client: LinearClient, nameOrNumber: string, teamId: null | string = null): Promise<null | string> {

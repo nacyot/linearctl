@@ -45,6 +45,7 @@ describe('issue list command', () => {
         nodes: [
           {
             assignee: { email: 'john@example.com', id: 'user-1', name: 'John Doe' },
+            comments: { nodes: [{ id: 'comment-1' }, { id: 'comment-2' }] },
             createdAt: new Date('2024-01-01'),
             id: 'issue-1',
             identifier: 'ENG-123',
@@ -54,6 +55,7 @@ describe('issue list command', () => {
           },
           {
             assignee: null,
+            comments: { nodes: [] },
             createdAt: new Date('2024-01-02'),
             id: 'issue-2',
             identifier: 'ENG-124',
@@ -76,6 +78,56 @@ describe('issue list command', () => {
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('ENG-123'))
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Fix bug in login'))
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('ENG-124'))
+  })
+
+  it('should display Updated and Comments columns in table', async () => {
+    const now = new Date()
+    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000)
+
+    const mockResponse = {
+      issues: {
+        nodes: [
+          {
+            assignee: { email: 'john@example.com', id: 'user-1', name: 'John Doe' },
+            comments: { nodes: [{ id: 'comment-1' }, { id: 'comment-2' }, { id: 'comment-3' }] },
+            createdAt: new Date('2024-01-01'),
+            id: 'issue-1',
+            identifier: 'ENG-123',
+            state: { color: '#ff0000', id: 'state-1', name: 'In Progress', type: 'started' },
+            title: 'Issue with comments',
+            updatedAt: twoHoursAgo,
+          },
+          {
+            assignee: null,
+            comments: { nodes: [] },
+            createdAt: new Date('2024-01-02'),
+            id: 'issue-2',
+            identifier: 'ENG-124',
+            state: { color: '#00ff00', id: 'state-2', name: 'Todo', type: 'unstarted' },
+            title: 'Issue without comments',
+            updatedAt: new Date('2024-01-02'),
+          },
+        ],
+      },
+    }
+
+    mockClient.client.request.mockResolvedValue(mockResponse)
+
+    const IssueList = (await import('../../../src/commands/issue/list.js')).default
+    const cmd = new IssueList([], {} as any)
+    await cmd.runWithoutParse({})
+
+    // Verify table headers include Updated and Comments
+    const tableOutput = logSpy.mock.calls.find((call: any[]) =>
+      call[0].includes('Updated') && call[0].includes('Comments')
+    )
+    expect(tableOutput).toBeTruthy()
+
+    // Verify comment count is displayed (3 comments for first issue)
+    const commentCountOutput = logSpy.mock.calls.find((call: any[]) =>
+      call[0].includes('3')
+    )
+    expect(commentCountOutput).toBeTruthy()
   })
 
   it('should filter by team name', async () => {
