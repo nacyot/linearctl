@@ -22,9 +22,16 @@ export interface ConfigSchema {
 
 export interface ListFlags extends CommonFlags {
   assignee?: string
+  'completed-after'?: string
+  'completed-before'?: string
+  'created-after'?: string
   'created-at'?: string
+  'created-before'?: string
   creator?: string
   cycle?: string
+  'due-date'?: string
+  'due-date-after'?: string
+  'due-date-before'?: string
   'exclude-state'?: string
   'include-archived'?: boolean
   label?: string
@@ -34,9 +41,12 @@ export interface ListFlags extends CommonFlags {
   project?: string
   query?: string
   search?: string
+  'show-completed'?: boolean
   state?: string
   team?: string
+  'updated-after'?: string
   'updated-at'?: string
+  'updated-before'?: string
 }
 
 export interface CreateIssueFlags {

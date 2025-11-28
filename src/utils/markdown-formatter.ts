@@ -8,8 +8,10 @@ interface CommentNode {
 interface IssueData {
   assignee?: { name: string }
   attachments?: { nodes: Array<{ title: string; url: string }> }
+  canceledAt?: Date | null | string
   children?: { nodes: Array<{ identifier: string; title: string }> }
   comments?: { nodes: CommentNode[] }
+  completedAt?: Date | null | string
   createdAt: Date | string
   cycle?: { name?: string; number?: number }
   description?: string
@@ -19,6 +21,7 @@ interface IssueData {
   parent?: { identifier: string; title: string }
   priority?: number
   project?: { name: string }
+  startedAt?: Date | null | string
   state?: { name: string; type?: string }
   team?: { key: string; name: string }
   title: string
@@ -71,7 +74,21 @@ export async function formatIssueAsMarkdown(issue: IssueData): Promise<string> {
   }
 
   // Dates
-  lines.push(`**Created:** ${formatDate(issue.createdAt)}`, `**Updated:** ${formatDate(issue.updatedAt)}`)
+  lines.push(`**Created:** ${formatDate(issue.createdAt)}`)
+
+  if (issue.startedAt) {
+    lines.push(`**Started:** ${formatDate(issue.startedAt)}`)
+  }
+
+  if (issue.completedAt) {
+    lines.push(`**Completed:** ${formatDate(issue.completedAt)}`)
+  }
+
+  if (issue.canceledAt) {
+    lines.push(`**Canceled:** ${formatDate(issue.canceledAt)}`)
+  }
+
+  lines.push(`**Updated:** ${formatDate(issue.updatedAt)}`)
 
   if (issue.dueDate) {
     lines.push(`**Due:** ${issue.dueDate}`)

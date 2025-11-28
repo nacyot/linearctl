@@ -252,4 +252,227 @@ describe('issue list command', () => {
 
     await expect(cmd.runWithoutParse({})).rejects.toThrow('API error')
   })
+
+  it('should include completedAt, startedAt, canceledAt in JSON output', async () => {
+    const mockResponse = {
+      issues: {
+        nodes: [
+          {
+            assignee: null,
+            canceledAt: null,
+            comments: { nodes: [] },
+            completedAt: new Date('2024-01-15'),
+            createdAt: new Date('2024-01-01'),
+            id: 'issue-1',
+            identifier: 'ENG-123',
+            priority: 2,
+            startedAt: new Date('2024-01-05'),
+            state: { color: '#00ff00', id: 'state-1', name: 'Done', type: 'completed' },
+            title: 'Completed issue',
+            updatedAt: new Date('2024-01-15'),
+          },
+        ],
+      },
+    }
+
+    mockClient.client.request.mockResolvedValue(mockResponse)
+
+    const IssueList = (await import('../../../src/commands/issue/list.js')).default
+    const cmd = new IssueList([], {} as any)
+    await cmd.runWithoutParse({ json: true })
+
+    const jsonOutput = logSpy.mock.calls.find((call: any[]) =>
+      call[0].includes('completedAt')
+    )
+    expect(jsonOutput).toBeTruthy()
+    expect(jsonOutput![0]).toContain('startedAt')
+    expect(jsonOutput![0]).toContain('canceledAt')
+  })
+
+  it('should filter by created-after date', async () => {
+    const mockResponse = {
+      issues: {
+        nodes: [],
+      },
+    }
+
+    mockClient.client.request.mockResolvedValue(mockResponse)
+
+    const IssueList = (await import('../../../src/commands/issue/list.js')).default
+    const cmd = new IssueList([], {} as any)
+    await cmd.runWithoutParse({ 'created-after': '2025-01-01' })
+
+    const requestCall = mockClient.client.request.mock.calls[0]
+    expect(requestCall[1].filter.createdAt.gte).toBeDefined()
+  })
+
+  it('should filter by completed-after date', async () => {
+    const mockResponse = {
+      issues: {
+        nodes: [],
+      },
+    }
+
+    mockClient.client.request.mockResolvedValue(mockResponse)
+
+    const IssueList = (await import('../../../src/commands/issue/list.js')).default
+    const cmd = new IssueList([], {} as any)
+    await cmd.runWithoutParse({ 'completed-after': '2025-01-01' })
+
+    const requestCall = mockClient.client.request.mock.calls[0]
+    expect(requestCall[1].filter.completedAt.gte).toBeDefined()
+  })
+
+  it('should filter by due-date', async () => {
+    const mockResponse = {
+      issues: {
+        nodes: [],
+      },
+    }
+
+    mockClient.client.request.mockResolvedValue(mockResponse)
+
+    const IssueList = (await import('../../../src/commands/issue/list.js')).default
+    const cmd = new IssueList([], {} as any)
+    await cmd.runWithoutParse({ 'due-date': '2025-01-15' })
+
+    const requestCall = mockClient.client.request.mock.calls[0]
+    expect(requestCall[1].filter.dueDate.eq).toBe('2025-01-15')
+  })
+
+  it('should show Completed column when --show-completed flag is used', async () => {
+    const mockResponse = {
+      issues: {
+        nodes: [
+          {
+            assignee: null,
+            canceledAt: null,
+            comments: { nodes: [] },
+            completedAt: new Date('2024-01-15'),
+            createdAt: new Date('2024-01-01'),
+            id: 'issue-1',
+            identifier: 'ENG-123',
+            priority: 2,
+            startedAt: new Date('2024-01-05'),
+            state: { color: '#00ff00', id: 'state-1', name: 'Done', type: 'completed' },
+            title: 'Completed issue',
+            updatedAt: new Date('2024-01-15'),
+          },
+        ],
+      },
+    }
+
+    mockClient.client.request.mockResolvedValue(mockResponse)
+
+    const IssueList = (await import('../../../src/commands/issue/list.js')).default
+    const cmd = new IssueList([], {} as any)
+    await cmd.runWithoutParse({ 'show-completed': true })
+
+    const tableOutput = logSpy.mock.calls.find((call: any[]) =>
+      call[0].includes('Completed')
+    )
+    expect(tableOutput).toBeTruthy()
+  })
+
+  it('should sort by completedAt when order-by is completedAt', async () => {
+    const mockResponse = {
+      issues: {
+        nodes: [
+          {
+            assignee: null,
+            canceledAt: null,
+            comments: { nodes: [] },
+            completedAt: new Date('2024-01-10'),
+            createdAt: new Date('2024-01-01'),
+            id: 'issue-1',
+            identifier: 'ENG-123',
+            priority: 2,
+            startedAt: null,
+            state: { color: '#00ff00', id: 'state-1', name: 'Done', type: 'completed' },
+            title: 'First completed',
+            updatedAt: new Date('2024-01-10'),
+          },
+          {
+            assignee: null,
+            canceledAt: null,
+            comments: { nodes: [] },
+            completedAt: new Date('2024-01-20'),
+            createdAt: new Date('2024-01-02'),
+            id: 'issue-2',
+            identifier: 'ENG-124',
+            priority: 1,
+            startedAt: null,
+            state: { color: '#00ff00', id: 'state-2', name: 'Done', type: 'completed' },
+            title: 'Second completed',
+            updatedAt: new Date('2024-01-20'),
+          },
+        ],
+      },
+    }
+
+    mockClient.client.request.mockResolvedValue(mockResponse)
+
+    const IssueList = (await import('../../../src/commands/issue/list.js')).default
+    const cmd = new IssueList([], {} as any)
+    await cmd.runWithoutParse({ json: true, 'order-by': 'completedAt' })
+
+    // Most recently completed should appear first in JSON output
+    const jsonCall = logSpy.mock.calls.find((call: any[]) => call[0].includes('['))
+    expect(jsonCall).toBeTruthy()
+    const parsed = JSON.parse(jsonCall![0])
+    // ENG-124 (completed Jan 20) should be first, ENG-123 (completed Jan 10) second
+    expect(parsed[0].identifier).toBe('ENG-124')
+    expect(parsed[1].identifier).toBe('ENG-123')
+  })
+
+  it('should sort by priority when order-by is priority', async () => {
+    const mockResponse = {
+      issues: {
+        nodes: [
+          {
+            assignee: null,
+            canceledAt: null,
+            comments: { nodes: [] },
+            completedAt: null,
+            createdAt: new Date('2024-01-01'),
+            id: 'issue-1',
+            identifier: 'ENG-123',
+            priority: 3,
+            startedAt: null,
+            state: { color: '#ff0000', id: 'state-1', name: 'In Progress', type: 'started' },
+            title: 'Low priority',
+            updatedAt: new Date('2024-01-10'),
+          },
+          {
+            assignee: null,
+            canceledAt: null,
+            comments: { nodes: [] },
+            completedAt: null,
+            createdAt: new Date('2024-01-02'),
+            id: 'issue-2',
+            identifier: 'ENG-124',
+            priority: 1,
+            startedAt: null,
+            state: { color: '#ff0000', id: 'state-2', name: 'In Progress', type: 'started' },
+            title: 'Urgent priority',
+            updatedAt: new Date('2024-01-20'),
+          },
+        ],
+      },
+    }
+
+    mockClient.client.request.mockResolvedValue(mockResponse)
+
+    const IssueList = (await import('../../../src/commands/issue/list.js')).default
+    const cmd = new IssueList([], {} as any)
+    await cmd.runWithoutParse({ json: true, 'order-by': 'priority' })
+
+    // Urgent (priority 1) should appear before Low (priority 3)
+    const jsonCall = logSpy.mock.calls.find((call: any[]) => call[0].includes('['))
+    expect(jsonCall).toBeTruthy()
+    const parsed = JSON.parse(jsonCall![0])
+    // ENG-124 (priority 1) should be first, ENG-123 (priority 3) second
+    expect(parsed[0].identifier).toBe('ENG-124')
+    expect(parsed[1].identifier).toBe('ENG-123')
+  })
 })

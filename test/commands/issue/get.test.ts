@@ -312,4 +312,79 @@ describe('issue get command', () => {
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Test issue'))
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('## Metadata'))
   })
+
+  it('should include completedAt, startedAt, canceledAt in JSON output', async () => {
+    const mockIssue = {
+      assignee: Promise.resolve(null),
+      attachments: vi.fn().mockResolvedValue({ nodes: [] }),
+      canceledAt: null,
+      children: vi.fn().mockResolvedValue({ nodes: [] }),
+      comments: vi.fn().mockResolvedValue({ nodes: [] }),
+      completedAt: new Date('2024-01-15'),
+      createdAt: new Date('2024-01-01'),
+      cycle: Promise.resolve(null),
+      description: 'Completed issue',
+      dueDate: '2024-01-20',
+      id: 'issue-1',
+      identifier: 'ENG-123',
+      labels: vi.fn().mockResolvedValue({ nodes: [] }),
+      parent: Promise.resolve(null),
+      priority: 2,
+      project: Promise.resolve(null),
+      startedAt: new Date('2024-01-05'),
+      state: Promise.resolve({ id: 'state-1', name: 'Done', type: 'completed' }),
+      team: Promise.resolve({ id: 'team-1', key: 'ENG', name: 'Engineering' }),
+      title: 'Test issue',
+      updatedAt: new Date('2024-01-15'),
+      url: 'https://linear.app/company/issue/ENG-123',
+    }
+
+    mockClient.issue.mockResolvedValue(mockIssue)
+
+    const IssueGet = (await import('../../../src/commands/issue/get.js')).default
+    const cmd = new IssueGet(['ENG-123'], {} as any)
+    await cmd.runWithArgs('ENG-123', { json: true })
+
+    const jsonCall = logSpy.mock.calls.find((call: any[]) => call[0].includes('ENG-123'))
+    expect(jsonCall).toBeTruthy()
+    expect(jsonCall![0]).toContain('completedAt')
+    expect(jsonCall![0]).toContain('startedAt')
+    expect(jsonCall![0]).toContain('canceledAt')
+  })
+
+  it('should show completedAt in markdown format', async () => {
+    const mockIssue = {
+      assignee: Promise.resolve({ name: 'John Doe' }),
+      attachments: vi.fn().mockResolvedValue({ nodes: [] }),
+      canceledAt: null,
+      children: vi.fn().mockResolvedValue({ nodes: [] }),
+      comments: vi.fn().mockResolvedValue({ nodes: [] }),
+      completedAt: new Date('2024-01-15T10:30:00Z'),
+      createdAt: new Date('2024-01-01'),
+      cycle: Promise.resolve(null),
+      description: 'Completed issue',
+      id: 'issue-1',
+      identifier: 'ENG-123',
+      labels: vi.fn().mockResolvedValue({ nodes: [] }),
+      parent: Promise.resolve(null),
+      priority: 2,
+      project: Promise.resolve(null),
+      startedAt: new Date('2024-01-05'),
+      state: Promise.resolve({ name: 'Done', type: 'completed' }),
+      team: Promise.resolve({ key: 'ENG', name: 'Engineering' }),
+      title: 'Completed issue',
+      updatedAt: new Date('2024-01-15'),
+      url: 'https://linear.app/company/issue/ENG-123',
+    }
+
+    mockClient.issue.mockResolvedValue(mockIssue)
+
+    const IssueGet = (await import('../../../src/commands/issue/get.js')).default
+    const cmd = new IssueGet(['ENG-123'], {} as any)
+    await cmd.runWithArgs('ENG-123', { format: 'markdown' })
+
+    // Verify completedAt is shown in markdown
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('**Completed:**'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('**Started:**'))
+  })
 })

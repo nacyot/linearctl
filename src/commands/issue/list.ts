@@ -13,8 +13,13 @@ import { formatState, formatTable, truncateText } from '../../utils/table-format
 // Type for issues with resolved assignee and state
 interface EnrichedIssue {
   assignee?: null | { name?: string }
+  canceledAt?: Date | null
   comments?: { nodes: Array<{ id: string }> }
+  completedAt?: Date | null
+  dueDate?: string
   identifier: string
+  priority?: number
+  startedAt?: Date | null
   state?: { name?: string; type?: string }
   title: string
   updatedAt?: Date
@@ -35,9 +40,30 @@ static flags = {
       char: 'a',
       description: 'Filter by assignee name or ID',
     }),
+    'completed-after': Flags.string({
+      description: 'Filter issues completed after date (ISO 8601 format, e.g., 2025-11-01)',
+    }),
+    'completed-before': Flags.string({
+      description: 'Filter issues completed before date (ISO 8601 format)',
+    }),
+    'created-after': Flags.string({
+      description: 'Filter issues created after date (ISO 8601 format, e.g., 2025-11-01)',
+    }),
+    'created-before': Flags.string({
+      description: 'Filter issues created before date (ISO 8601 format)',
+    }),
     cycle: Flags.string({
       char: 'c',
       description: 'Filter by cycle name or ID',
+    }),
+    'due-date': Flags.string({
+      description: 'Filter by due date (ISO 8601 format, e.g., 2025-11-28)',
+    }),
+    'due-date-after': Flags.string({
+      description: 'Filter issues with due date after date (ISO 8601 format)',
+    }),
+    'due-date-before': Flags.string({
+      description: 'Filter issues with due date before date (ISO 8601 format)',
     }),
     'exclude-state': Flags.string({
       description: 'Exclude state name(s), comma-separated',
@@ -60,8 +86,8 @@ static flags = {
     }),
     'order-by': Flags.string({
       default: 'updatedAt',
-      description: 'Order by field',
-      options: ['createdAt', 'updatedAt'],
+      description: 'Order by field (completedAt, dueDate, priority require client-side sorting)',
+      options: ['createdAt', 'updatedAt', 'completedAt', 'dueDate', 'priority'],
     }),
     project: Flags.string({
       char: 'p',
@@ -70,6 +96,10 @@ static flags = {
     search: Flags.string({
       description: 'Search in title and description (case-insensitive)',
     }),
+    'show-completed': Flags.boolean({
+      default: false,
+      description: 'Show Completed column in table output',
+    }),
     state: Flags.string({
       char: 's',
       description: 'Filter by state name(s), comma-separated',
@@ -77,6 +107,12 @@ static flags = {
     team: Flags.string({
       char: 't',
       description: 'Filter by team name or ID',
+    }),
+    'updated-after': Flags.string({
+      description: 'Filter issues updated after date (ISO 8601 format, e.g., 2025-11-01)',
+    }),
+    'updated-before': Flags.string({
+      description: 'Filter issues updated before date (ISO 8601 format)',
     }),
   }
 
@@ -272,7 +308,63 @@ static flags = {
           { description: { containsIgnoreCase: flags.search } }
         ]
       }
-      
+
+      // Date filters - createdAt
+      if (flags['created-after'] || flags['created-before']) {
+        filter.createdAt = {}
+
+        if (flags['created-after']) {
+          filter.createdAt.gte = new Date(flags['created-after']).toISOString()
+        }
+
+        if (flags['created-before']) {
+          filter.createdAt.lte = new Date(flags['created-before']).toISOString()
+        }
+      }
+
+      // Date filters - updatedAt
+      if (flags['updated-after'] || flags['updated-before']) {
+        filter.updatedAt = {}
+
+        if (flags['updated-after']) {
+          filter.updatedAt.gte = new Date(flags['updated-after']).toISOString()
+        }
+
+        if (flags['updated-before']) {
+          filter.updatedAt.lte = new Date(flags['updated-before']).toISOString()
+        }
+      }
+
+      // Date filters - completedAt
+      if (flags['completed-after'] || flags['completed-before']) {
+        filter.completedAt = {}
+
+        if (flags['completed-after']) {
+          filter.completedAt.gte = new Date(flags['completed-after']).toISOString()
+        }
+
+        if (flags['completed-before']) {
+          filter.completedAt.lte = new Date(flags['completed-before']).toISOString()
+        }
+      }
+
+      // Date filters - dueDate
+      if (flags['due-date'] || flags['due-date-after'] || flags['due-date-before']) {
+        filter.dueDate = {}
+
+        if (flags['due-date']) {
+          filter.dueDate.eq = flags['due-date']
+        }
+
+        if (flags['due-date-after']) {
+          filter.dueDate.gte = flags['due-date-after']
+        }
+
+        if (flags['due-date-before']) {
+          filter.dueDate.lte = flags['due-date-before']
+        }
+      }
+
       // Prepare query variables
       const variables: {
         filter?: LinearDocument.IssueFilter
@@ -316,6 +408,9 @@ static flags = {
               dueDate
               createdAt
               updatedAt
+              completedAt
+              startedAt
+              canceledAt
               assignee {
                 id
                 name
@@ -357,7 +452,9 @@ static flags = {
           issues: {
             nodes: Array<{
               assignee: null | { email: string; id: string; name: string }
+              canceledAt: Date | null
               comments: { nodes: Array<{ id: string }> }
+              completedAt: Date | null
               createdAt: Date
               cycle: null | { id: string; name: null | string; number: number }
               description?: string
@@ -368,6 +465,7 @@ static flags = {
               labels: { nodes: Array<{ id: string; name: string }> }
               priority: number
               project: null | { id: string; name: string }
+              startedAt: Date | null
               state: { color: string; id: string; name: string; type: string }
               title: string
               updatedAt: Date
@@ -376,13 +474,43 @@ static flags = {
         },
         typeof variables
       >(ISSUE_LIST_QUERY, variables)
-      const issuesWithState = data.issues.nodes
-      
+      let issuesWithState = data.issues.nodes
+
+      // Client-side sorting for fields not supported by API pagination
+      const orderBy = flags['order-by']
+
+      if (orderBy === 'completedAt' || orderBy === 'dueDate' || orderBy === 'priority') {
+        issuesWithState = [...issuesWithState].sort((a, b) => {
+          if (orderBy === 'completedAt') {
+            const aDate = a.completedAt ? new Date(a.completedAt).getTime() : 0
+            const bDate = b.completedAt ? new Date(b.completedAt).getTime() : 0
+            return bDate - aDate // Most recently completed first
+          }
+
+          if (orderBy === 'dueDate') {
+            // Issues without due date go to the end
+            if (!a.dueDate && !b.dueDate) return 0
+            if (!a.dueDate) return 1
+            if (!b.dueDate) return -1
+            return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime() // Earliest due date first
+          }
+
+          if (orderBy === 'priority') {
+            // Higher priority (lower number, but 0 means no priority) should come first
+            const aPriority = a.priority === 0 ? 999 : a.priority
+            const bPriority = b.priority === 0 ? 999 : b.priority
+            return aPriority - bPriority
+          }
+
+          return 0
+        })
+      }
+
       // Output results
       if (flags.json) {
         console.log(JSON.stringify(issuesWithState, null, 2))
       } else {
-        this.displayIssues(issuesWithState)
+        this.displayIssues(issuesWithState, flags['show-completed'] || false)
       }
       
     } catch (error) {
@@ -390,7 +518,7 @@ static flags = {
     }
   }
 
-  private displayIssues(issues: EnrichedIssue[]): void {
+  private displayIssues(issues: EnrichedIssue[], showCompleted = false): void {
     if (issues.length === 0) {
       console.log(chalk.yellow('No issues found'))
       return
@@ -399,21 +527,36 @@ static flags = {
     console.log(chalk.bold(`\nFound ${issues.length} issue${issues.length === 1 ? '' : 's'}:`))
 
     // Prepare table data
-    const headers = ['ID', 'Title', 'State', 'Assignee', 'Updated', 'Comments']
-    const rows = issues.map(issue => [
-      chalk.cyan(issue.identifier),
-      truncateText(issue.title, 40),
-      formatState(issue.state),
-      truncateText(issue.assignee?.name || chalk.gray('Unassigned'), 15),
-      this.formatRelativeDate(issue.updatedAt),
-      issue.comments ? String(issue.comments.nodes.length) : '0'
-    ])
+    const headers = showCompleted
+      ? ['ID', 'Title', 'State', 'Completed', 'Updated', 'Comments']
+      : ['ID', 'Title', 'State', 'Assignee', 'Updated', 'Comments']
+
+    const rows = issues.map(issue => {
+      const baseRow = [
+        chalk.cyan(issue.identifier),
+        truncateText(issue.title, 40),
+        formatState(issue.state),
+      ]
+
+      if (showCompleted) {
+        baseRow.push(this.formatRelativeDate(issue.completedAt))
+      } else {
+        baseRow.push(truncateText(issue.assignee?.name || chalk.gray('Unassigned'), 15))
+      }
+
+      baseRow.push(
+        this.formatRelativeDate(issue.updatedAt),
+        issue.comments ? String(issue.comments.nodes.length) : '0'
+      )
+
+      return baseRow
+    })
 
     // Display table
     console.log(formatTable({ headers, rows }))
   }
 
-  private formatRelativeDate(date?: Date): string {
+  private formatRelativeDate(date?: Date | null): string {
     if (!date) return chalk.gray('N/A')
 
     const now = new Date()
