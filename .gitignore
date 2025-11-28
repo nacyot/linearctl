@@ -18,3 +18,4 @@ pnpm-lock.yaml
 /.env.local
 tsconfig.tsbuildinfo
 .notes/
+website/
